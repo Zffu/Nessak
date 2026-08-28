@@ -1,6 +1,8 @@
-use std::{io::Bytes, marker::PhantomData, range};
+use std::marker::PhantomData;
 
 use crate::utils::lcm;
+
+pub mod nessak;
 
 pub trait TundraImplementation {
     fn expand_generate(n: usize, o: &[u32], w: usize) -> u32;

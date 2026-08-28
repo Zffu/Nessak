@@ -7,4 +7,4 @@ edition = "2024"
 safety-checks = []
 tundra = []
 
-default = ["safety-checks"]
+default = ["safety-checks", "tundra"]
