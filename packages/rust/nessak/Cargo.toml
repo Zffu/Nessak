@@ -1,10 +1,17 @@
 [package]
 name = "nessak"
-version = "0.1.0"
+version = "1.0.0"
+authors = ["Zffu <zffu@zffu.dev>"]
+description = "Nessak is an experimental hash function powered by the experimental Tundra hash structure."
+repository = "https://github.com/Zffu/Nessak"
+readme = "./README.md"
+license = "MIT"
+categories = ["algorithms", "cryptography"]
 edition = "2024"
 
 [features]
-safety-checks = []
 tundra = []
+standalone = []
+safety-checks = []
 
-default = ["safety-checks", "tundra"]
+default = ["safety-checks", "tundra", "standalone"]
