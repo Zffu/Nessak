@@ -146,7 +146,8 @@ impl<I: TundraImplementation> Tundra<I> {
             for r in 0..compression_rounds {
                 let (part_a, part_b) = buffer.split_at_mut(part_a_offset + self.part_size);
                 let part_a = &mut part_a[part_a_offset..part_a_offset + self.part_size];
-                let part_b = &part_b[part_b_offset..part_b_offset + self.part_size];
+                let part_b = &part_b[part_b_offset - (part_a_offset + self.part_size)
+                    ..part_b_offset - part_a_offset];
 
                 I::compress_inner(part_a, part_b, r);
             }
@@ -168,7 +169,7 @@ impl<I: TundraImplementation> Tundra<I> {
 
         for r in 0..descent_compression_rounds {
             for k in 0..lane_expansion_count {
-                let p = 0.max(k - 1);
+                let p = 0_i64.max(k as i64 - 1) as usize;
 
                 I::descent_compression_inner(lane_a, lane_b, k, p, r);
             }
@@ -181,15 +182,20 @@ impl<I: TundraImplementation> Tundra<I> {
         lane_size_in_words: usize,
         descent_compression_rounds: usize,
     ) -> Vec<u32> {
-        let mut working_set = vec![];
         let mut compression_set = internal_state.to_vec();
+        let mut working_set = Vec::new();
 
         let mut result_lane_set = vec![0_u32; lane_size_in_words];
 
-        while compression_set.len() > 1 {
-            for n in 0..compression_set.len() / 2 {
-                let lane_a = &compression_set[n * 2..n * 2 + lane_size_in_words];
-                let lane_b = &compression_set[n * 2 + 1..n * 2 + 1 + lane_size_in_words];
+        while compression_set.len() > lane_size_in_words {
+            working_set.clear();
+
+            for n in 0..compression_set.len() / (2 * lane_size_in_words) {
+                let lane_a_start = n * 2 * lane_size_in_words;
+                let lane_b_start = lane_a_start + lane_size_in_words;
+
+                let lane_a = &compression_set[lane_a_start..lane_a_start + lane_size_in_words];
+                let lane_b = &compression_set[lane_b_start..lane_b_start + lane_size_in_words];
 
                 result_lane_set.copy_from_slice(&lane_a);
 
@@ -199,13 +205,10 @@ impl<I: TundraImplementation> Tundra<I> {
                     descent_compression_rounds,
                 );
 
-                // Copy back the result to lane_a
-                compression_set[n * 2..n * 2 + lane_size_in_words]
-                    .copy_from_slice(&result_lane_set);
+                working_set.extend_from_slice(&result_lane_set);
             }
 
-            compression_set.clone_from_slice(&working_set);
-            working_set.clear();
+            std::mem::swap(&mut compression_set, &mut working_set);
         }
 
         compression_set[0..lane_size_in_words].to_vec()
@@ -227,7 +230,7 @@ impl<I: TundraImplementation> Tundra<I> {
         let mut digest = vec![];
 
         for num in &lane {
-            digest.extend_from_slice(&num.to_be_bytes());
+            digest.extend_from_slice(&num.to_le_bytes());
         }
 
         digest[0..digest_size as usize / 8].to_vec()
