@@ -211,7 +211,10 @@ impl<I: TundraImplementation> Tundra<I> {
             std::mem::swap(&mut compression_set, &mut working_set);
         }
 
-        compression_set[0..lane_size_in_words].to_vec()
+        working_set.clear();
+        working_set.extend_from_slice(&compression_set[0..lane_size_in_words]);
+
+        working_set
     }
 
     pub(crate) fn get_digest(
