@@ -1,4 +1,7 @@
-use std::marker::PhantomData;
+use core::marker::PhantomData;
+
+use alloc::vec;
+use alloc::vec::Vec;
 
 use crate::utils::lcm;
 
@@ -120,7 +123,7 @@ impl<I: TundraImplementation> Tundra<I> {
         buffer: &mut [u32],
         compression_rounds: usize,
     ) -> Vec<u32> {
-        let mut internal_state = vec![];
+        let mut internal_state = Vec::new();
 
         let amount_of_parts = buffer.len() / self.part_size;
 
@@ -208,7 +211,7 @@ impl<I: TundraImplementation> Tundra<I> {
                 working_set.extend_from_slice(&result_lane_set);
             }
 
-            std::mem::swap(&mut compression_set, &mut working_set);
+            core::mem::swap(&mut compression_set, &mut working_set);
         }
 
         working_set.clear();

@@ -2,6 +2,8 @@
 //! The Nessak implementation of the Tundra structure.
 //!
 
+use alloc::vec::Vec;
+
 use crate::tundra::{Tundra, TundraImplementation};
 
 pub const INNER_PERMUTATION_ROT: [u32; 25] = [
