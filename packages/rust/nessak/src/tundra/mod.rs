@@ -46,13 +46,13 @@ pub trait Tundra {
     );
 
     fn descend_internal_state(
-        internal_state: &[u32],
+        internal_state: Vec<u32>,
         lane_size_in_words: usize,
         descent_compression_rounds: usize,
     ) -> Vec<u32>;
 
     fn get_digest(
-        internal_state: &[u32],
+        internal_state: Vec<u32>,
         digest_size: u64,
         lane_size_in_words: usize,
         descent_compression_rounds: usize,
@@ -107,11 +107,11 @@ impl<I: TundraImplementation> Tundra for I {
 
         let input_word_count = input.len() / 4;
 
-        let mut buffer = Vec::with_capacity(internal_state_size * 2);
+        let mut buffer = Vec::with_capacity(internal_state_size / 2);
         buffer.extend(
             input
                 .chunks_exact(4)
-                .map(|word| u32::from_be_bytes(word.try_into().unwrap())),
+                .map(|word| u32::from_be_bytes([word[0], word[1], word[2], word[3]])),
         );
 
         for n in input_word_count..(internal_state_size / 2) {
@@ -201,7 +201,7 @@ impl<I: TundraImplementation> Tundra for I {
 
         for r in 0..descent_compression_rounds {
             for k in 0..lane_expansion_count {
-                let p = 0_i64.max(k as i64 - 1) as usize;
+                let p = k.saturating_sub(1);
 
                 I::descent_compression_inner(lane_a, lane_b, k, p, r);
             }
@@ -209,14 +209,11 @@ impl<I: TundraImplementation> Tundra for I {
     }
 
     fn descend_internal_state(
-        internal_state: &[u32],
+        mut compression_set: Vec<u32>,
         lane_size_in_words: usize,
         descent_compression_rounds: usize,
     ) -> Vec<u32> {
-        let mut compression_set = internal_state.to_vec();
-        let mut working_set = Vec::with_capacity(internal_state.len() / 2);
-
-        let mut result_lane_set = vec![0_u32; lane_size_in_words];
+        let mut working_set = Vec::with_capacity(compression_set.len() / 2);
 
         while compression_set.len() > lane_size_in_words {
             working_set.clear();
@@ -228,15 +225,14 @@ impl<I: TundraImplementation> Tundra for I {
                 let lane_a = &compression_set[lane_a_start..lane_a_start + lane_size_in_words];
                 let lane_b = &compression_set[lane_b_start..lane_b_start + lane_size_in_words];
 
-                result_lane_set.copy_from_slice(&lane_a);
+                let output_start = working_set.len();
+                working_set.resize(output_start + lane_size_in_words, 0);
 
-                Self::descent_generation_round(
-                    &mut result_lane_set,
-                    lane_b,
-                    descent_compression_rounds,
-                );
+                let output = &mut working_set[output_start..];
 
-                working_set.extend_from_slice(&result_lane_set);
+                output.copy_from_slice(&lane_a);
+
+                Self::descent_generation_round(output, lane_b, descent_compression_rounds);
             }
 
             core::mem::swap(&mut compression_set, &mut working_set);
@@ -249,7 +245,7 @@ impl<I: TundraImplementation> Tundra for I {
     }
 
     fn get_digest(
-        internal_state: &[u32],
+        internal_state: Vec<u32>,
         digest_size: u64,
         lane_size_in_words: usize,
         descent_compression_rounds: usize,
@@ -273,7 +269,6 @@ impl<I: TundraImplementation> Tundra for I {
         digest[0..digest_size as usize / 8].to_vec()
     }
 
-    #[inline(never)]
     fn produce_hash(
         input: &[u8],
         digest_size: u64,
@@ -315,7 +310,7 @@ impl<I: TundraImplementation> Tundra for I {
             Self::compress_buffer_into_internal_state(&mut buffer, compression_rounds);
 
         return Self::get_digest(
-            &internal_state,
+            internal_state,
             digest_size,
             lane_size_in_words,
             descent_compression_rounds,
