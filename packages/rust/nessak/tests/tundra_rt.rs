@@ -149,6 +149,21 @@ fn nessak_digest_tests() {
         NessakTundraImplementation::k256_64(hello_world),
         [0xBA, 0xDE, 0x83, 0x86, 0x7E, 0x5B, 0xE2, 0xF1]
     );
+
+    assert_eq!(
+        NessakTundraImplementation::k256_32(&[]),
+        [0x27, 0x1B, 0x85, 0xA5]
+    );
+    assert_eq!(
+        NessakTundraImplementation::k256_32(hello_world),
+        [0x4E, 0xE2, 0x76, 0x77]
+    );
+
+    assert_eq!(NessakTundraImplementation::k256_16(&[]), [0x16, 0xF8]);
+    assert_eq!(
+        NessakTundraImplementation::k256_16(hello_world),
+        [0x1C, 0x9A]
+    );
 }
 
 #[test]

@@ -11,7 +11,7 @@ edition = "2024"
 
 [[test]]
 name = "tundra_rt"
-required-features = ["tundra-nessak"]
+required-features = ["tundra-nessak", "safety-checks"]
 
 [[test]]
 name = "tundra_const"
@@ -24,4 +24,4 @@ standalone = []
 safety-checks = []
 const = []
 
-default = ["safety-checks", "tundra-nessak", "standalone", "const"]
+default = ["safety-checks", "tundra-nessak", "standalone"]
