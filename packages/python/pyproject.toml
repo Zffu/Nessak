@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nessak"
+version = "1.0.0"
+description = "Nessak is an experimental hash function powered by the experimental Tundra hash structure."
+readme = "./README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Zffu", email = "zffu@zffu.dev"}
+]
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
