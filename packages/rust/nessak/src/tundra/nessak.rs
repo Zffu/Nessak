@@ -45,7 +45,7 @@ impl TundraImplementation for NessakTundraImplementation {
 
 macro_rules! make_helper_normal {
     ($($name: ident => ($lane: literal, $digest: literal)),* $(,)?) => {
-		#[cfg(not(feature = "const"))]
+		#[cfg(any(not(feature = "const"), doc))]
 		impl NessakTundraImplementation {
 			$(
 				#[doc = concat!("Helper for normal Nessak standard ", stringify!($name))]
@@ -60,7 +60,7 @@ macro_rules! make_helper_normal {
 
 macro_rules! make_helper_extended {
     ($($name: ident => ($lane: literal, $digest: literal)),* $(,)?) => {
-		#[cfg(not(feature = "const"))]
+		#[cfg(any(not(feature = "const"), doc))]
 		impl NessakTundraImplementation {
 			$(
 				#[doc = concat!("Helper for extended Nessak standard ", stringify!($name))]

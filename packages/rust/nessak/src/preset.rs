@@ -4,18 +4,32 @@
 /// Represents a parameter preset inside of a constant implementation inside of this crate.
 /// Normally, these values would be provided at runtime but these allow to pass them at compile time on a const implementation.
 pub trait TundraPreset {
+    /// The size of the digest (in bits).
     const DIGEST_SIZE: usize;
+
+    /// The size of each descent lane (in bits).
     const LANE_SIZE: usize;
+
+    /// The amount of rounds of compression.
     const COMPRESSION_ROUNDS: usize;
+
+    /// The amount of rounds of descent compression.
     const DESCENT_COMPRESSION_ROUNDS: usize;
+
+    /// The amount of rounds of inner permutations.
     const INNER_PERMUTATION_ROUNDS: usize;
+
+    /// The amount of rounds of outer permutation.
     const OUTER_PERMUTATION_ROUNDS: usize;
+
+    /// The multiplier for the minimum size of the internal size based on input size.
     const INTERNAL_STATE_MINIMUM_LENGTH_MULTIPLIER: usize;
 }
 
 macro_rules! make_preset_normal {
     ($lane_size: literal; $($struct_name:ident => $digest: literal),* $(,)?) => {
         $(
+			#[doc = concat!("Parameter preset for Nessak normal preset ", stringify!($struct_name))]
 			pub struct $struct_name;
 
 			impl TundraPreset for $struct_name {
@@ -34,6 +48,7 @@ macro_rules! make_preset_normal {
 macro_rules! make_preset_extended {
     ($lane_size: literal; $($struct_name:ident => $digest: literal),* $(,)?) => {
         $(
+			#[doc = concat!("Parameter preset for Nessak extended preset ", stringify!($struct_name))]
 			pub struct $struct_name;
 
 			impl TundraPreset for $struct_name {

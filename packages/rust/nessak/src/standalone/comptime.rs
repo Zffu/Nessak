@@ -7,21 +7,30 @@ use crate::{
     utils::math::lcm,
 };
 
+/// Trait to attach compile time capabilities to [`Nessak`].
 pub trait CompNessak<P: TundraPreset> {
+    /// Sanitizes the given input so that it matches length requirements for the rest of the structure.
     fn sanitize_input(input: &[u8]) -> Vec<u8>;
 
+    /// Expands the input into the “buffer”.
     fn expand_input_buffer(input: &[u8]) -> Vec<u32>;
 
+    /// Perform the permutations on the “buffer”.
     fn do_buffer_permutations(buffer: &mut [u32]);
 
+    /// Compresses the buffer into the internal state.
     fn compress_buffer_into_internal_state(buffer: &mut [u32]) -> Vec<u32>;
 
+    /// Performs a round of a descent generation on lane A and B.
     fn descent_generation_round(lane_a: &mut [u32], lane_b: &[u32]);
 
+    /// Performs the descent on the internal stage.
     fn descend_internal_state(compression_set: Vec<u32>) -> Vec<u32>;
 
+    /// Obtains the digest from the internal state.
     fn get_digest(internal_state: Vec<u32>) -> Vec<u8>;
 
+    /// Produce the hash for the given input
     fn produce_hash(input: &[u8]) -> Vec<u8>;
 }
 

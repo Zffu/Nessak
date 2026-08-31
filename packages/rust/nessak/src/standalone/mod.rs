@@ -10,6 +10,7 @@ use crate::{
 };
 
 #[cfg(feature = "const")]
+/// The const variant of the standalone implementation.
 pub mod comptime;
 
 /// The Nessak hash function.
@@ -226,6 +227,18 @@ impl Nessak {
         digest[0..digest_size as usize / 8].to_vec()
     }
 
+    /// Produces a hash for the given input and given parameters using the standard Nessak algorithm.
+    ///
+    /// # Examples
+    /// ```
+    /// # #[cfg(not(feature = "const"))] {
+    ///	use nessak::standalone::Nessak;
+    ///
+    /// let digest = Nessak::produce_hash(&[], 128, 256, 64, 8, 24, 4, 1);
+    ///
+    /// # }
+    /// ```
+    ///
     pub fn produce_hash(
         input: &[u8],
         digest_size: u64,
@@ -274,3 +287,55 @@ impl Nessak {
         );
     }
 }
+
+macro_rules! make_helper_normal {
+    ($($name: ident => ($lane: literal, $digest: literal)),* $(,)?) => {
+		#[cfg(any(not(feature = "const"), doc))]
+		impl Nessak {
+			$(
+				#[doc = concat!("Helper for normal Nessak standard ", stringify!($name))]
+				pub fn $name(input: &[u8]) -> Vec<u8> {
+					Self::produce_hash(input, $digest, $lane, 64, 8, 24, 4, 1)
+				}
+			)*
+		}
+
+	};
+}
+
+macro_rules! make_helper_extended {
+    ($($name: ident => ($lane: literal, $digest: literal)),* $(,)?) => {
+		#[cfg(any(not(feature = "const"), doc))]
+		impl Nessak {
+			$(
+				#[doc = concat!("Helper for extended Nessak standard ", stringify!($name))]
+				pub fn $name(input: &[u8]) -> Vec<u8> {
+					Self::produce_hash(input, $digest, $lane, 64, 16, 24, 16, 2)
+				}
+			)*
+		}
+
+	};
+}
+
+make_helper_normal!(
+    k2048_2048 => (2048, 2048),
+    k1024_1024 => (1024, 1024),
+    k512_512 => (512, 512),
+    k256_256 => (256, 256),
+    k256_128 => (256, 128),
+    k256_64 => (256, 64),
+    k256_32 => (256, 32),
+    k256_16 => (256, 16)
+);
+
+make_helper_extended!(
+    k4096_2048 => (4096, 2048),
+    k2048_1024 => (2048, 1024),
+    k1024_512 => (1024, 512),
+    k512_256 => (512, 256),
+    k512_128 => (512, 128),
+    k512_64 => (512, 64),
+    k512_32 => (512, 32),
+    k512_16 => (512, 16)
+);

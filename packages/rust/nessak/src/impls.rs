@@ -48,30 +48,37 @@ pub const DESCENT_COMPRESSION_CONSTANTS: [u32; 8] = [
     0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A, 0x510E527F, 0x9B05688C, 0x1F83D9AB, 0x5BE0CD19,
 ];
 
+/// The rotation function used in Nessak.
 pub fn rotr(x: u32, n: u32) -> u32 {
     return (x >> n) | (x << (32 - n));
 }
 
+/// The `zeta0` number modification function
 pub fn zeta0(x: u32) -> u32 {
     return rotr(x, 2) ^ rotr(x, 7) ^ rotr(x, 17) ^ x.wrapping_shr(3);
 }
 
+/// The `zeta1` number modification function.
 pub fn zeta1(x: u32) -> u32 {
     return rotr(x, 17) ^ rotr(x, 19) ^ x.wrapping_shr(11);
 }
 
+/// The `alpha0` number compression function.
 pub fn alpha0(x: u32, y: u32, z: u32) -> u32 {
     return (x & rotr(y, 3)) ^ ((!x) & z);
 }
 
+/// The `beta` number compression function.
 pub fn beta(x: u32, y: u32, z: u32) -> u32 {
     return (x & y) ^ (z & x) ^ (y & z);
 }
 
+/// Rotates a 64-bit number.
 pub fn rotl_64(x: u64, n: u32) -> u64 {
     return (x << n) | (x.wrapping_shr(64 - n));
 }
 
+/// Generates the `n`-th bit based on the buffer `o` and the input word count `w`.
 pub fn expand_generate(n: usize, o: &[u32], w: usize) -> u32 {
     o[n - w]
         .wrapping_add(zeta0(o[n - 14]))
@@ -79,6 +86,7 @@ pub fn expand_generate(n: usize, o: &[u32], w: usize) -> u32 {
         .wrapping_add(o[n - 6])
 }
 
+/// The inner function of the permutation.
 pub fn permutation_inner(state: &mut [u32], harmonizer: &[u32], inner_permutation_rounds: usize) {
     let mut state_64: [u64; 25] = [0; 25];
     let mut harmonizer_64: [u64; 25] = [0; 25];
@@ -138,6 +146,7 @@ pub fn permutation_inner(state: &mut [u32], harmonizer: &[u32], inner_permutatio
     }
 }
 
+/// The compression inner function
 pub fn compress_inner(part_a: &mut [u32], part_b: &[u32], round: usize) {
     let z1 = zeta0(part_a[3]);
     let c = alpha0(part_a[3], part_a[4], part_a[5]);
@@ -163,6 +172,7 @@ pub fn compress_inner(part_a: &mut [u32], part_b: &[u32], round: usize) {
     part_a[0] = t1.wrapping_add(t2);
 }
 
+/// The descent compression inner function.
 pub fn descent_compression_inner(lane_a: &mut [u32], lane_b: &[u32], k: usize, p: usize, r: usize) {
     let curr_offset = k * 8;
     let prev_offset = p * 8;
