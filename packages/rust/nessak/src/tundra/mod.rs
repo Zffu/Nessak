@@ -1,13 +1,14 @@
-use core::marker::PhantomData;
-
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::utils::lcm;
+use crate::utils::math::lcm;
 
 pub mod nessak;
 
-pub trait TundraImplementation {
+pub trait TundraImplementation<const PERMUTATION_MUL_SIZE: usize> {
+    const MINIMUM_EXPANSION_LEN: usize;
+    const PART_SIZE: usize;
+
     fn expand_generate(n: usize, o: &[u32], w: usize) -> u32;
 
     fn permutation_inner(state: &mut [u32], harmonizer: &[u32], inner_permutation_rounds: usize);
@@ -17,33 +18,65 @@ pub trait TundraImplementation {
     fn descent_compression_inner(lane_a: &mut [u32], lane_b: &[u32], k: usize, p: usize, r: usize);
 }
 
-pub struct Tundra<I: TundraImplementation> {
-    minimum_expansion_len: usize,
-    permutation_mul_size: usize,
-    part_size: usize,
+pub trait Tundra<const PERMUTATION_MUL_SIZE: usize> {
+    fn sanitize_input(input: &[u8], digest_size: u64) -> Vec<u8>;
 
-    __marker: PhantomData<I>,
+    fn expand_input_buffer(
+        input: &[u8],
+        lane_size: usize,
+        internal_state_minimum_length_multiplier: usize,
+    ) -> Vec<u32>;
+
+    fn do_buffer_permutations(
+        buffer: &mut [u32],
+        inner_permutation_rounds: usize,
+        outer_permutation_rounds: usize,
+    );
+
+    fn compress_buffer_into_internal_state(
+        buffer: &mut [u32],
+        compression_rounds: usize,
+    ) -> Vec<u32>;
+
+    fn descent_generation_round(
+        lane_a: &mut [u32],
+        lane_b: &[u32],
+        descent_compression_rounds: usize,
+    );
+
+    fn descend_internal_state(
+        internal_state: &[u32],
+        lane_size_in_words: usize,
+        descent_compression_rounds: usize,
+    ) -> Vec<u32>;
+
+    fn get_digest(
+        internal_state: &[u32],
+        digest_size: u64,
+        lane_size_in_words: usize,
+        descent_compression_rounds: usize,
+    ) -> Vec<u8>;
+
+    fn produce_hash(
+        input: &[u8],
+        digest_size: u64,
+        lane_size: usize,
+        compression_rounds: usize,
+        descent_compression_rounds: usize,
+        inner_permutation_rounds: usize,
+        outer_permutation_rounds: usize,
+        internal_state_minimum_length_multiplier: usize,
+    ) -> Vec<u8>;
 }
 
-impl<I: TundraImplementation> Tundra<I> {
-    pub fn new(
-        minimum_expansion_len: usize,
-        permutation_mul_size: usize,
-        part_size: usize,
-    ) -> Self {
-        Self {
-            minimum_expansion_len,
-            permutation_mul_size,
-            part_size,
-            __marker: PhantomData,
-        }
-    }
-
-    pub(crate) fn sanitize_input(&self, input: &[u8], digest_size: u64) -> Vec<u8> {
+impl<const PERMUTATION_MUL_SIZE: usize, I: TundraImplementation<PERMUTATION_MUL_SIZE>>
+    Tundra<PERMUTATION_MUL_SIZE> for I
+{
+    fn sanitize_input(input: &[u8], digest_size: u64) -> Vec<u8> {
         let original_len = input.len();
         let mut expanded_input = input.to_vec();
 
-        let mut padded_len = (self.minimum_expansion_len + 17).max(original_len + 17);
+        let mut padded_len = (I::MINIMUM_EXPANSION_LEN + 17).max(original_len + 17);
 
         if padded_len % 4 != 0 {
             padded_len += 4 - (padded_len % 4);
@@ -61,8 +94,7 @@ impl<I: TundraImplementation> Tundra<I> {
         expanded_input
     }
 
-    pub(crate) fn expand_input_buffer(
-        &self,
+    fn expand_input_buffer(
         input: &[u8],
         lane_size: usize,
         internal_state_minimum_length_multiplier: usize,
@@ -72,7 +104,7 @@ impl<I: TundraImplementation> Tundra<I> {
             .map(|word| u32::from_be_bytes(word.try_into().unwrap()))
             .collect();
 
-        let mut internal_state_size: usize = lcm(lcm(self.permutation_mul_size, 4), lane_size / 8);
+        let mut internal_state_size: usize = lcm(lcm(PERMUTATION_MUL_SIZE, 4), lane_size / 8);
 
         internal_state_size =
             ((input.len() * internal_state_minimum_length_multiplier + internal_state_size - 1)
@@ -88,29 +120,28 @@ impl<I: TundraImplementation> Tundra<I> {
         buffer
     }
 
-    pub(crate) fn do_buffer_permutations(
-        &self,
+    fn do_buffer_permutations(
         buffer: &mut [u32],
         inner_permutation_rounds: usize,
         outer_permutation_rounds: usize,
     ) {
-        let block_count = buffer.len() / self.permutation_mul_size;
+        let block_count = buffer.len() / PERMUTATION_MUL_SIZE;
 
         // Preallocate the capacity
-        let mut harmonizer: Vec<u32> = vec![0; self.permutation_mul_size];
+        let mut harmonizer: [u32; PERMUTATION_MUL_SIZE] = [0; PERMUTATION_MUL_SIZE];
 
         for _ in 0..outer_permutation_rounds {
             harmonizer.fill(0);
 
-            for i in 0..block_count * self.permutation_mul_size {
-                let y = i % self.permutation_mul_size;
+            for i in 0..block_count * PERMUTATION_MUL_SIZE {
+                let y = i % PERMUTATION_MUL_SIZE;
 
                 harmonizer[y] ^= buffer[i];
             }
 
             for x in 0..block_count {
                 I::permutation_inner(
-                    &mut buffer[x * self.permutation_mul_size..(x + 1) * self.permutation_mul_size],
+                    &mut buffer[x * PERMUTATION_MUL_SIZE..(x + 1) * PERMUTATION_MUL_SIZE],
                     &harmonizer,
                     inner_permutation_rounds,
                 );
@@ -118,14 +149,13 @@ impl<I: TundraImplementation> Tundra<I> {
         }
     }
 
-    pub(crate) fn compress_buffer_into_internal_state(
-        &self,
+    fn compress_buffer_into_internal_state(
         buffer: &mut [u32],
         compression_rounds: usize,
     ) -> Vec<u32> {
-        let mut internal_state = Vec::new();
+        let mut internal_state = Vec::with_capacity(buffer.len() / 2);
 
-        let amount_of_parts = buffer.len() / self.part_size;
+        let amount_of_parts = buffer.len() / I::PART_SIZE;
 
         let mut part_a_index;
         let mut part_b_index;
@@ -143,27 +173,25 @@ impl<I: TundraImplementation> Tundra<I> {
                 k += 2;
             }
 
-            let part_a_offset = self.part_size * part_a_index;
-            let part_b_offset = self.part_size * part_b_index;
+            let part_a_offset = I::PART_SIZE * part_a_index;
+            let part_b_offset = I::PART_SIZE * part_b_index;
 
             for r in 0..compression_rounds {
-                let (part_a, part_b) = buffer.split_at_mut(part_a_offset + self.part_size);
-                let part_a = &mut part_a[part_a_offset..part_a_offset + self.part_size];
-                let part_b = &part_b[part_b_offset - (part_a_offset + self.part_size)
-                    ..part_b_offset - part_a_offset];
+                let (part_a, part_b) = buffer.split_at_mut(part_a_offset + I::PART_SIZE);
+                let part_a = &mut part_a[part_a_offset..part_a_offset + I::PART_SIZE];
+                let part_b = &part_b
+                    [part_b_offset - (part_a_offset + I::PART_SIZE)..part_b_offset - part_a_offset];
 
                 I::compress_inner(part_a, part_b, r);
             }
 
-            internal_state
-                .extend_from_slice(&buffer[part_a_offset..part_a_offset + self.part_size]);
+            internal_state.extend_from_slice(&buffer[part_a_offset..part_a_offset + I::PART_SIZE]);
         }
 
         internal_state
     }
 
-    pub(crate) fn descent_generation_round(
-        &self,
+    fn descent_generation_round(
         lane_a: &mut [u32],
         lane_b: &[u32],
         descent_compression_rounds: usize,
@@ -179,8 +207,7 @@ impl<I: TundraImplementation> Tundra<I> {
         }
     }
 
-    pub(crate) fn descend_internal_state(
-        &self,
+    fn descend_internal_state(
         internal_state: &[u32],
         lane_size_in_words: usize,
         descent_compression_rounds: usize,
@@ -202,7 +229,7 @@ impl<I: TundraImplementation> Tundra<I> {
 
                 result_lane_set.copy_from_slice(&lane_a);
 
-                self.descent_generation_round(
+                Self::descent_generation_round(
                     &mut result_lane_set,
                     lane_b,
                     descent_compression_rounds,
@@ -220,14 +247,13 @@ impl<I: TundraImplementation> Tundra<I> {
         working_set
     }
 
-    pub(crate) fn get_digest(
-        &self,
+    fn get_digest(
         internal_state: &[u32],
         digest_size: u64,
         lane_size_in_words: usize,
         descent_compression_rounds: usize,
     ) -> Vec<u8> {
-        let lane = self.descend_internal_state(
+        let lane = Self::descend_internal_state(
             internal_state,
             lane_size_in_words,
             descent_compression_rounds,
@@ -242,8 +268,7 @@ impl<I: TundraImplementation> Tundra<I> {
         digest[0..digest_size as usize / 8].to_vec()
     }
 
-    pub fn produce_hash(
-        &self,
+    fn produce_hash(
         input: &[u8],
         digest_size: u64,
         lane_size: usize,
@@ -269,21 +294,21 @@ impl<I: TundraImplementation> Tundra<I> {
 
         let lane_size_in_words = lane_size / 32;
 
-        let input = self.sanitize_input(input, digest_size);
+        let input = Self::sanitize_input(input, digest_size);
 
         let mut buffer =
-            self.expand_input_buffer(&input, lane_size, internal_state_minimum_length_multiplier);
+            Self::expand_input_buffer(&input, lane_size, internal_state_minimum_length_multiplier);
 
-        self.do_buffer_permutations(
+        Self::do_buffer_permutations(
             &mut buffer,
             inner_permutation_rounds,
             outer_permutation_rounds,
         );
 
         let internal_state =
-            self.compress_buffer_into_internal_state(&mut buffer, compression_rounds);
+            Self::compress_buffer_into_internal_state(&mut buffer, compression_rounds);
 
-        return self.get_digest(
+        return Self::get_digest(
             &internal_state,
             digest_size,
             lane_size_in_words,

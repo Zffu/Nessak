@@ -78,7 +78,10 @@ pub fn rotl_64(x: u64, n: u32) -> u64 {
 
 pub struct NessakTundraImplementation {}
 
-impl TundraImplementation for NessakTundraImplementation {
+impl TundraImplementation<50> for NessakTundraImplementation {
+    const MINIMUM_EXPANSION_LEN: usize = 56;
+    const PART_SIZE: usize = 8;
+
     fn expand_generate(n: usize, o: &[u32], w: usize) -> u32 {
         o[n - w]
             .wrapping_add(zeta0(o[n - 14]))
@@ -211,73 +214,67 @@ impl TundraImplementation for NessakTundraImplementation {
 }
 
 impl NessakTundraImplementation {
-    pub fn new() -> Tundra<NessakTundraImplementation> {
-        Tundra::new(56, 50, 8)
-    }
-}
-
-impl Tundra<NessakTundraImplementation> {
-    pub fn k2048_2048(&self, input: &[u8]) -> Vec<u8> {
-        self.produce_hash(input, 2048, 2048, 64, 8, 24, 4, 1)
+    pub fn k2048_2048(input: &[u8]) -> Vec<u8> {
+        Self::produce_hash(input, 2048, 2048, 64, 8, 24, 4, 1)
     }
 
-    pub fn k1024_1024(&self, input: &[u8]) -> Vec<u8> {
-        self.produce_hash(input, 1024, 1024, 64, 8, 24, 4, 1)
+    pub fn k1024_1024(input: &[u8]) -> Vec<u8> {
+        Self::produce_hash(input, 1024, 1024, 64, 8, 24, 4, 1)
     }
 
-    pub fn k512_512(&self, input: &[u8]) -> Vec<u8> {
-        self.produce_hash(input, 512, 512, 64, 8, 24, 4, 1)
+    pub fn k512_512(input: &[u8]) -> Vec<u8> {
+        Self::produce_hash(input, 512, 512, 64, 8, 24, 4, 1)
     }
 
-    pub fn k256_256(&self, input: &[u8]) -> Vec<u8> {
-        self.produce_hash(input, 256, 256, 64, 8, 24, 4, 1)
+    pub fn k256_256(input: &[u8]) -> Vec<u8> {
+        Self::produce_hash(input, 256, 256, 64, 8, 24, 4, 1)
     }
 
-    pub fn k256_128(&self, input: &[u8]) -> Vec<u8> {
-        self.produce_hash(input, 128, 256, 64, 8, 24, 4, 1)
+    pub fn k256_128(input: &[u8]) -> Vec<u8> {
+        Self::produce_hash(input, 128, 256, 64, 8, 24, 4, 1)
     }
 
-    pub fn k256_64(&self, input: &[u8]) -> Vec<u8> {
-        self.produce_hash(input, 64, 256, 64, 8, 24, 4, 1)
+    pub fn k256_64(input: &[u8]) -> Vec<u8> {
+        Self::produce_hash(input, 64, 256, 64, 8, 24, 4, 1)
     }
 
-    pub fn k256_32(&self, input: &[u8]) -> Vec<u8> {
-        self.produce_hash(input, 32, 256, 64, 8, 24, 4, 1)
+    pub fn k256_32(input: &[u8]) -> Vec<u8> {
+        Self::produce_hash(input, 32, 256, 64, 8, 24, 4, 1)
     }
 
-    pub fn k256_16(&self, input: &[u8]) -> Vec<u8> {
-        self.produce_hash(input, 16, 256, 64, 8, 24, 4, 1)
+    pub fn k256_16(input: &[u8]) -> Vec<u8> {
+        Self::produce_hash(input, 16, 256, 64, 8, 24, 4, 1)
     }
 
-    pub fn k4096_2048(&self, input: &[u8]) -> Vec<u8> {
-        self.produce_hash(input, 2048, 4096, 64, 16, 24, 16, 2)
+    pub fn k4096_2048(input: &[u8]) -> Vec<u8> {
+        Self::produce_hash(input, 2048, 4096, 64, 16, 24, 16, 2)
     }
 
-    pub fn k2048_1024(&self, input: &[u8]) -> Vec<u8> {
-        self.produce_hash(input, 1024, 2048, 64, 16, 24, 16, 2)
+    pub fn k2048_1024(input: &[u8]) -> Vec<u8> {
+        Self::produce_hash(input, 1024, 2048, 64, 16, 24, 16, 2)
     }
 
-    pub fn k1024_512(&self, input: &[u8]) -> Vec<u8> {
-        self.produce_hash(input, 512, 1024, 64, 16, 24, 16, 2)
+    pub fn k1024_512(input: &[u8]) -> Vec<u8> {
+        Self::produce_hash(input, 512, 1024, 64, 16, 24, 16, 2)
     }
 
-    pub fn k512_256(&self, input: &[u8]) -> Vec<u8> {
-        self.produce_hash(input, 256, 512, 64, 16, 24, 16, 2)
+    pub fn k512_256(input: &[u8]) -> Vec<u8> {
+        Self::produce_hash(input, 256, 512, 64, 16, 24, 16, 2)
     }
 
-    pub fn k512_128(&self, input: &[u8]) -> Vec<u8> {
-        self.produce_hash(input, 128, 512, 64, 16, 24, 16, 2)
+    pub fn k512_128(input: &[u8]) -> Vec<u8> {
+        Self::produce_hash(input, 128, 512, 64, 16, 24, 16, 2)
     }
 
-    pub fn k512_64(&self, input: &[u8]) -> Vec<u8> {
-        self.produce_hash(input, 64, 512, 64, 16, 24, 16, 2)
+    pub fn k512_64(input: &[u8]) -> Vec<u8> {
+        Self::produce_hash(input, 64, 512, 64, 16, 24, 16, 2)
     }
 
-    pub fn k512_32(&self, input: &[u8]) -> Vec<u8> {
-        self.produce_hash(input, 32, 512, 64, 16, 24, 16, 2)
+    pub fn k512_32(input: &[u8]) -> Vec<u8> {
+        Self::produce_hash(input, 32, 512, 64, 16, 24, 16, 2)
     }
 
-    pub fn k512_16(&self, input: &[u8]) -> Vec<u8> {
-        self.produce_hash(input, 16, 512, 64, 16, 24, 16, 2)
+    pub fn k512_16(input: &[u8]) -> Vec<u8> {
+        Self::produce_hash(input, 16, 512, 64, 16, 24, 16, 2)
     }
 }
