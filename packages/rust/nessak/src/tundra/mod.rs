@@ -1,7 +1,7 @@
 //! The Tundra implementation.
 //! Also contains a Nessak implementation that uses the Tundra implementation.
 
-#[cfg(not(feature = "const"))]
+#[cfg(any(not(feature = "const"), doc))]
 use alloc::vec;
 
 use alloc::vec::Vec;
@@ -45,7 +45,7 @@ pub trait TundraImplementation {
 
 /// Trait used to propagate the Tundra structure functions on every [`TundraImplementation`] implementation.
 #[cfg(feature = "const")]
-pub trait Tundra<P: TundraPreset> {
+pub trait TundraConst<P: TundraPreset> {
     /// Sanitizes the given input so that it matches length requirements for the rest of the structure.
     fn sanitize_input(input: &[u8]) -> Vec<u8>;
 
@@ -72,8 +72,8 @@ pub trait Tundra<P: TundraPreset> {
 }
 
 /// Trait used to propagate the Tundra structure functions on every [`TundraImplementation`] implementation.
-#[cfg(not(feature = "const"))]
-pub trait Tundra {
+#[cfg(any(not(feature = "const"), doc))]
+pub trait TundraRuntime {
     /// Sanitizes the given input so that it matches length requirements for the rest of the structure.
     fn sanitize_input(input: &[u8], digest_size: u64) -> Vec<u8>;
 
@@ -132,8 +132,8 @@ pub trait Tundra {
     ) -> Vec<u8>;
 }
 
-#[cfg(not(feature = "const"))]
-impl<I: TundraImplementation> Tundra for I {
+#[cfg(any(not(feature = "const"), doc))]
+impl<I: TundraImplementation> TundraRuntime for I {
     fn sanitize_input(input: &[u8], digest_size: u64) -> Vec<u8> {
         let original_len = input.len();
         let mut expanded_input = input.to_vec();

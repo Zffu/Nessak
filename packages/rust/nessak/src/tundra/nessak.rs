@@ -6,7 +6,7 @@
 use alloc::vec::Vec;
 
 #[cfg(not(feature = "const"))]
-use crate::tundra::Tundra;
+use crate::tundra::TundraRuntime;
 
 use crate::tundra::TundraImplementation;
 

@@ -6,11 +6,11 @@ use alloc::vec::Vec;
 
 use crate::{
     preset::TundraPreset,
-    tundra::{Tundra, TundraImplementation},
+    tundra::{TundraConst, TundraImplementation},
     utils::math::lcm,
 };
 
-impl<I: TundraImplementation, P: TundraPreset> Tundra<P> for I {
+impl<I: TundraImplementation, P: TundraPreset> TundraConst<P> for I {
     fn sanitize_input(input: &[u8]) -> Vec<u8> {
         let original_len = input.len();
         let mut expanded_input = input.to_vec();
