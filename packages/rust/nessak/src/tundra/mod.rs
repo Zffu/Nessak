@@ -5,9 +5,10 @@ use crate::utils::math::lcm;
 
 pub mod nessak;
 
-pub trait TundraImplementation<const PERMUTATION_MUL_SIZE: usize> {
+pub trait TundraImplementation {
     const MINIMUM_EXPANSION_LEN: usize;
     const PART_SIZE: usize;
+    const PERMUTATION_MUL_SIZE: usize;
 
     fn expand_generate(n: usize, o: &[u32], w: usize) -> u32;
 
@@ -18,7 +19,7 @@ pub trait TundraImplementation<const PERMUTATION_MUL_SIZE: usize> {
     fn descent_compression_inner(lane_a: &mut [u32], lane_b: &[u32], k: usize, p: usize, r: usize);
 }
 
-pub trait Tundra<const PERMUTATION_MUL_SIZE: usize> {
+pub trait Tundra {
     fn sanitize_input(input: &[u8], digest_size: u64) -> Vec<u8>;
 
     fn expand_input_buffer(
@@ -69,9 +70,7 @@ pub trait Tundra<const PERMUTATION_MUL_SIZE: usize> {
     ) -> Vec<u8>;
 }
 
-impl<const PERMUTATION_MUL_SIZE: usize, I: TundraImplementation<PERMUTATION_MUL_SIZE>>
-    Tundra<PERMUTATION_MUL_SIZE> for I
-{
+impl<I: TundraImplementation> Tundra for I {
     fn sanitize_input(input: &[u8], digest_size: u64) -> Vec<u8> {
         let original_len = input.len();
         let mut expanded_input = input.to_vec();
@@ -99,12 +98,7 @@ impl<const PERMUTATION_MUL_SIZE: usize, I: TundraImplementation<PERMUTATION_MUL_
         lane_size: usize,
         internal_state_minimum_length_multiplier: usize,
     ) -> Vec<u32> {
-        let mut buffer: Vec<u32> = input
-            .chunks_exact(4)
-            .map(|word| u32::from_be_bytes(word.try_into().unwrap()))
-            .collect();
-
-        let mut internal_state_size: usize = lcm(lcm(PERMUTATION_MUL_SIZE, 4), lane_size / 8);
+        let mut internal_state_size: usize = lcm(I::PERMUTATION_MUL_SIZE * 4, lane_size / 8);
 
         internal_state_size =
             ((input.len() * internal_state_minimum_length_multiplier + internal_state_size - 1)
@@ -112,6 +106,13 @@ impl<const PERMUTATION_MUL_SIZE: usize, I: TundraImplementation<PERMUTATION_MUL_
                 * internal_state_size;
 
         let input_word_count = input.len() / 4;
+
+        let mut buffer = Vec::with_capacity(internal_state_size * 2);
+        buffer.extend(
+            input
+                .chunks_exact(4)
+                .map(|word| u32::from_be_bytes(word.try_into().unwrap())),
+        );
 
         for n in input_word_count..(internal_state_size / 2) {
             buffer.push(I::expand_generate(n, &buffer, input_word_count));
@@ -125,23 +126,23 @@ impl<const PERMUTATION_MUL_SIZE: usize, I: TundraImplementation<PERMUTATION_MUL_
         inner_permutation_rounds: usize,
         outer_permutation_rounds: usize,
     ) {
-        let block_count = buffer.len() / PERMUTATION_MUL_SIZE;
+        let block_count = buffer.len() / I::PERMUTATION_MUL_SIZE;
 
         // Preallocate the capacity
-        let mut harmonizer: [u32; PERMUTATION_MUL_SIZE] = [0; PERMUTATION_MUL_SIZE];
+        let mut harmonizer: Vec<u32> = vec![0; I::PERMUTATION_MUL_SIZE];
 
         for _ in 0..outer_permutation_rounds {
             harmonizer.fill(0);
 
-            for i in 0..block_count * PERMUTATION_MUL_SIZE {
-                let y = i % PERMUTATION_MUL_SIZE;
+            for i in 0..block_count * I::PERMUTATION_MUL_SIZE {
+                let y = i % I::PERMUTATION_MUL_SIZE;
 
                 harmonizer[y] ^= buffer[i];
             }
 
             for x in 0..block_count {
                 I::permutation_inner(
-                    &mut buffer[x * PERMUTATION_MUL_SIZE..(x + 1) * PERMUTATION_MUL_SIZE],
+                    &mut buffer[x * I::PERMUTATION_MUL_SIZE..(x + 1) * I::PERMUTATION_MUL_SIZE],
                     &harmonizer,
                     inner_permutation_rounds,
                 );
@@ -213,7 +214,7 @@ impl<const PERMUTATION_MUL_SIZE: usize, I: TundraImplementation<PERMUTATION_MUL_
         descent_compression_rounds: usize,
     ) -> Vec<u32> {
         let mut compression_set = internal_state.to_vec();
-        let mut working_set = Vec::new();
+        let mut working_set = Vec::with_capacity(internal_state.len() / 2);
 
         let mut result_lane_set = vec![0_u32; lane_size_in_words];
 
@@ -259,15 +260,20 @@ impl<const PERMUTATION_MUL_SIZE: usize, I: TundraImplementation<PERMUTATION_MUL_
             descent_compression_rounds,
         );
 
-        let mut digest = vec![];
+        let word_count_digest = ((digest_size + digest_size % 32) / 32) as usize;
+        let mut digest = Vec::with_capacity(word_count_digest * 4);
 
-        for num in &lane {
-            digest.extend_from_slice(&num.to_le_bytes());
+        let mut ind = 0;
+        while digest.len() < digest_size as usize / 8 && ind < lane.len() {
+            digest.extend_from_slice(&lane[ind].to_le_bytes());
+
+            ind += 1;
         }
 
         digest[0..digest_size as usize / 8].to_vec()
     }
 
+    #[inline(never)]
     fn produce_hash(
         input: &[u8],
         digest_size: u64,

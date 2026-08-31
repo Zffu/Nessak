@@ -78,9 +78,10 @@ pub fn rotl_64(x: u64, n: u32) -> u64 {
 
 pub struct NessakTundraImplementation {}
 
-impl TundraImplementation<50> for NessakTundraImplementation {
+impl TundraImplementation for NessakTundraImplementation {
     const MINIMUM_EXPANSION_LEN: usize = 56;
     const PART_SIZE: usize = 8;
+    const PERMUTATION_MUL_SIZE: usize = 50;
 
     fn expand_generate(n: usize, o: &[u32], w: usize) -> u32 {
         o[n - w]
