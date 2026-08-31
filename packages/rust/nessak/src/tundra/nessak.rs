@@ -10,11 +10,13 @@ use crate::tundra::Tundra;
 
 use crate::tundra::TundraImplementation;
 
-pub const INNER_PERMUTATION_ROT: [u32; 25] = [
+/// The rotation constants for the inner permutation.
+pub(crate) const INNER_PERMUTATION_ROT: [u32; 25] = [
     0, 36, 3, 41, 18, 1, 44, 10, 45, 2, 62, 6, 43, 15, 61, 28, 55, 25, 21, 56, 27, 20, 39, 8, 14,
 ];
 
-pub const INNER_PERMUTATION_RC: [u64; 24] = [
+/// The round constants for the inner permutation.
+pub(crate) const INNER_PERMUTATION_RC: [u64; 24] = [
     0x0000000000000001,
     0x0000000000008082,
     0x800000000000808A,
@@ -41,7 +43,8 @@ pub const INNER_PERMUTATION_RC: [u64; 24] = [
     0x8000000080008008,
 ];
 
-pub const COMPRESSION_CONSTANTS: [u32; 64] = [
+/// The round constants for the inner compression.
+pub(crate) const COMPRESSION_CONSTANTS: [u32; 64] = [
     0xCBBB9D5D, 0x629A292A, 0x9159015A, 0x152FECD8, 0x67332667, 0x8EB44A87, 0xDB0C2E0D, 0x47B5481D,
     0xAE5F9156, 0xCF6C85D3, 0x2F73477D, 0x6D1826CA, 0x8B43D457, 0xE360B596, 0x1C456002, 0x6F196331,
     0xD94EBEB1, 0x0CC4A611, 0x261DC1F2, 0x5815A7BE, 0x70B7ED67, 0xA1513C69, 0x44F93635, 0x720DCDFD,
@@ -52,35 +55,37 @@ pub const COMPRESSION_CONSTANTS: [u32; 64] = [
     0xB11A32E8, 0xCDF34E80, 0x31830426, 0x5B89092B, 0xA0C06A13, 0xAE79842F, 0xC9CDA689, 0xF281F239,
 ];
 
-pub const DESCENT_COMPRESSION_CONSTANTS: [u32; 8] = [
+/// The round constants for the inner descent compression.
+pub(crate) const DESCENT_COMPRESSION_CONSTANTS: [u32; 8] = [
     0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A, 0x510E527F, 0x9B05688C, 0x1F83D9AB, 0x5BE0CD19,
 ];
 
-pub fn rotr(x: u32, n: u32) -> u32 {
+pub(crate) fn rotr(x: u32, n: u32) -> u32 {
     return (x >> n) | (x << (32 - n));
 }
 
-pub fn zeta0(x: u32) -> u32 {
+pub(crate) fn zeta0(x: u32) -> u32 {
     return rotr(x, 2) ^ rotr(x, 7) ^ rotr(x, 17) ^ x.wrapping_shr(3);
 }
 
-pub fn zeta1(x: u32) -> u32 {
+pub(crate) fn zeta1(x: u32) -> u32 {
     return rotr(x, 17) ^ rotr(x, 19) ^ x.wrapping_shr(11);
 }
 
-pub fn alpha0(x: u32, y: u32, z: u32) -> u32 {
+pub(crate) fn alpha0(x: u32, y: u32, z: u32) -> u32 {
     return (x & rotr(y, 3)) ^ ((!x) & z);
 }
 
-pub fn beta(x: u32, y: u32, z: u32) -> u32 {
+pub(crate) fn beta(x: u32, y: u32, z: u32) -> u32 {
     return (x & y) ^ (z & x) ^ (y & z);
 }
 
-pub fn rotl_64(x: u64, n: u32) -> u64 {
+pub(crate) fn rotl_64(x: u64, n: u32) -> u64 {
     return (x << n) | (x.wrapping_shr(64 - n));
 }
 
-pub struct NessakTundraImplementation {}
+/// The implementation of the *Nessak* hash function using the *Tundra* structure implementation.
+pub struct NessakTundraImplementation;
 
 impl TundraImplementation for NessakTundraImplementation {
     const MINIMUM_EXPANSION_LEN: usize = 56;
@@ -218,69 +223,54 @@ impl TundraImplementation for NessakTundraImplementation {
     }
 }
 
-#[cfg(not(feature = "const"))]
-impl NessakTundraImplementation {
-    pub fn k2048_2048(input: &[u8]) -> Vec<u8> {
-        Self::produce_hash(input, 2048, 2048, 64, 8, 24, 4, 1)
-    }
+macro_rules! make_helper_normal {
+    ($($name: ident => ($lane: literal, $digest: literal)),* $(,)?) => {
+		#[cfg(not(feature = "const"))]
+		impl NessakTundraImplementation {
+			$(
+				#[doc = concat!("Helper for normal Nessak standard ", stringify!($name))]
+				pub fn $name(input: &[u8]) -> Vec<u8> {
+					Self::produce_hash(input, $digest, $lane, 64, 8, 24, 4, 1)
+				}
+			)*
+		}
 
-    pub fn k1024_1024(input: &[u8]) -> Vec<u8> {
-        Self::produce_hash(input, 1024, 1024, 64, 8, 24, 4, 1)
-    }
-
-    pub fn k512_512(input: &[u8]) -> Vec<u8> {
-        Self::produce_hash(input, 512, 512, 64, 8, 24, 4, 1)
-    }
-
-    pub fn k256_256(input: &[u8]) -> Vec<u8> {
-        Self::produce_hash(input, 256, 256, 64, 8, 24, 4, 1)
-    }
-
-    pub fn k256_128(input: &[u8]) -> Vec<u8> {
-        Self::produce_hash(input, 128, 256, 64, 8, 24, 4, 1)
-    }
-
-    pub fn k256_64(input: &[u8]) -> Vec<u8> {
-        Self::produce_hash(input, 64, 256, 64, 8, 24, 4, 1)
-    }
-
-    pub fn k256_32(input: &[u8]) -> Vec<u8> {
-        Self::produce_hash(input, 32, 256, 64, 8, 24, 4, 1)
-    }
-
-    pub fn k256_16(input: &[u8]) -> Vec<u8> {
-        Self::produce_hash(input, 16, 256, 64, 8, 24, 4, 1)
-    }
-
-    pub fn k4096_2048(input: &[u8]) -> Vec<u8> {
-        Self::produce_hash(input, 2048, 4096, 64, 16, 24, 16, 2)
-    }
-
-    pub fn k2048_1024(input: &[u8]) -> Vec<u8> {
-        Self::produce_hash(input, 1024, 2048, 64, 16, 24, 16, 2)
-    }
-
-    pub fn k1024_512(input: &[u8]) -> Vec<u8> {
-        Self::produce_hash(input, 512, 1024, 64, 16, 24, 16, 2)
-    }
-
-    pub fn k512_256(input: &[u8]) -> Vec<u8> {
-        Self::produce_hash(input, 256, 512, 64, 16, 24, 16, 2)
-    }
-
-    pub fn k512_128(input: &[u8]) -> Vec<u8> {
-        Self::produce_hash(input, 128, 512, 64, 16, 24, 16, 2)
-    }
-
-    pub fn k512_64(input: &[u8]) -> Vec<u8> {
-        Self::produce_hash(input, 64, 512, 64, 16, 24, 16, 2)
-    }
-
-    pub fn k512_32(input: &[u8]) -> Vec<u8> {
-        Self::produce_hash(input, 32, 512, 64, 16, 24, 16, 2)
-    }
-
-    pub fn k512_16(input: &[u8]) -> Vec<u8> {
-        Self::produce_hash(input, 16, 512, 64, 16, 24, 16, 2)
-    }
+	};
 }
+
+macro_rules! make_helper_extended {
+    ($($name: ident => ($lane: literal, $digest: literal)),* $(,)?) => {
+		#[cfg(not(feature = "const"))]
+		impl NessakTundraImplementation {
+			$(
+				#[doc = concat!("Helper for extended Nessak standard ", stringify!($name))]
+				pub fn $name(input: &[u8]) -> Vec<u8> {
+					Self::produce_hash(input, $digest, $lane, 64, 16, 24, 16, 2)
+				}
+			)*
+		}
+
+	};
+}
+
+make_helper_normal!(
+    k2048_2048 => (2048, 2048),
+    k1024_1024 => (1024, 1024),
+    k512_512 => (512, 512),
+    k256_256 => (256, 256),
+    k256_128 => (256, 128),
+    k256_64 => (256, 64),
+    k256_32 => (256, 32),
+    k256_16 => (256, 16)
+);
+
+make_helper_extended!(
+    k4096_2048 => (4096, 2048),
+    k2048_1024 => (2048, 1024),
+    k1024_512 => (1024, 512),
+    k512_256 => (512, 256),
+    k512_128 => (512, 128),
+    k512_64 => (512, 64),
+    k512_32 => (512, 32),
+    k512_16 => (512, 16)
+);

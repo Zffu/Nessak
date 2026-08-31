@@ -1,3 +1,6 @@
+//! The constant implementation of Tundra.
+//! Similar to the normal implementation but uses [`TundraPreset`] to store parameters rather than at runtime.
+
 use alloc::vec;
 use alloc::vec::Vec;
 

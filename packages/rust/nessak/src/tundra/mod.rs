@@ -1,3 +1,6 @@
+//! The Tundra implementation.
+//! Also contains a Nessak implementation that uses the Tundra implementation.
+
 #[cfg(not(feature = "const"))]
 use alloc::vec;
 
@@ -15,72 +18,100 @@ use crate::utils::math::lcm;
 #[cfg(feature = "tundra-nessak")]
 pub mod nessak;
 
+/// Defines a Tundra implementation.
+/// A Tundra implementation refers to definitions of the set of functions used inside of the Tundra structure.
 pub trait TundraImplementation {
+    /// The minimum expansion length for the given implementation
     const MINIMUM_EXPANSION_LEN: usize;
+
+    /// The size of a compression parts (in 32-bit integers)
     const PART_SIZE: usize;
+
+    /// The permutation "block" size (in 32-bit integers).
     const PERMUTATION_MUL_SIZE: usize;
 
+    /// Generates the n-th bit based on the output and input word size inside of the expansion stage.
     fn expand_generate(n: usize, o: &[u32], w: usize) -> u32;
 
+    /// Performs the inner permutation on the state with the given harmonizer for the given amount of inner rounds.
     fn permutation_inner(state: &mut [u32], harmonizer: &[u32], inner_permutation_rounds: usize);
 
+    /// Peforms the inner compression on the part A and B for the n-th round.
     fn compress_inner(part_a: &mut [u32], part_b: &[u32], round: usize);
 
+    /// Performs the descent inner compression function on lane A and B for the lane expansion k, the previous lane expansion p for the r-th round.
     fn descent_compression_inner(lane_a: &mut [u32], lane_b: &[u32], k: usize, p: usize, r: usize);
 }
 
+/// Trait used to propagate the Tundra structure functions on every [`TundraImplementation`] implementation.
 #[cfg(feature = "const")]
 pub trait Tundra<P: TundraPreset> {
+    /// Sanitizes the given input so that it matches length requirements for the rest of the structure.
     fn sanitize_input(input: &[u8]) -> Vec<u8>;
 
+    /// Expands the input into the "buffer"
     fn expand_input_buffer(input: &[u8]) -> Vec<u32>;
 
+    /// Perform the permutations on the "buffer"
     fn do_buffer_permutations(buffer: &mut [u32]);
 
+    /// Compresses the buffer into the internal state
     fn compress_buffer_into_internal_state(buffer: &mut [u32]) -> Vec<u32>;
 
+    /// Performs a round of a descent generation on lane A and B.
     fn descent_generation_round(lane_a: &mut [u32], lane_b: &[u32]);
 
+    /// Performs the descent on the internal stage
     fn descend_internal_state(internal_state: Vec<u32>) -> Vec<u32>;
 
+    /// Obtains the digest from the internal state
     fn get_digest(internal_state: Vec<u32>) -> Vec<u8>;
 
+    /// Produce the hash for the given input
     fn produce_hash(input: &[u8]) -> Vec<u8>;
 }
 
+/// Trait used to propagate the Tundra structure functions on every [`TundraImplementation`] implementation.
 #[cfg(not(feature = "const"))]
 pub trait Tundra {
+    /// Sanitizes the given input so that it matches length requirements for the rest of the structure.
     fn sanitize_input(input: &[u8], digest_size: u64) -> Vec<u8>;
 
+    /// Expands the input into the "buffer"
     fn expand_input_buffer(
         input: &[u8],
         lane_size: usize,
         internal_state_minimum_length_multiplier: usize,
     ) -> Vec<u32>;
 
+    /// Perform the permutations on the "buffer"
     fn do_buffer_permutations(
         buffer: &mut [u32],
         inner_permutation_rounds: usize,
         outer_permutation_rounds: usize,
     );
 
+    /// Compresses the buffer into the internal state
     fn compress_buffer_into_internal_state(
         buffer: &mut [u32],
         compression_rounds: usize,
     ) -> Vec<u32>;
 
+    /// Performs a round of a descent generation on lane A and B.
     fn descent_generation_round(
         lane_a: &mut [u32],
         lane_b: &[u32],
         descent_compression_rounds: usize,
     );
 
+    /// Performs the descent on the internal stage
     fn descend_internal_state(
         internal_state: Vec<u32>,
         lane_size_in_words: usize,
         descent_compression_rounds: usize,
     ) -> Vec<u32>;
 
+    /// Obtains the digest from the internal state
     fn get_digest(
         internal_state: Vec<u32>,
         digest_size: u64,
@@ -88,6 +119,7 @@ pub trait Tundra {
         descent_compression_rounds: usize,
     ) -> Vec<u8>;
 
+    /// Produce the hash for the given input
     fn produce_hash(
         input: &[u8],
         digest_size: u64,

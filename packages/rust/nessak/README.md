@@ -14,9 +14,6 @@ In order to allow customizability over what you need from this crate, multiple f
 - `standalone`: Bundles a standalone implementation of _Nessak_ that doesn't rely on the _Tundra_ structure implementation but still uses it internally.
 - `const`: Enforces every parameter to be selected at compile time, removing the capacity of setting parameters at runtime but allowing for potentially higher performance while trading for file size (if using multiple parameter sets / standards).
 
-> [!NOTE]
-> The `const` feature is not implemented yet.
-
 ## Nessak Examples
 
 ### Tundra Nessak

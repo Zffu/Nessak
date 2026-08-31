@@ -1,4 +1,4 @@
-pub const fn gcd(mut a: usize, mut b: usize) -> usize {
+pub(crate) const fn gcd(mut a: usize, mut b: usize) -> usize {
     while b != 0 {
         let temp = b;
         b = a % b;
@@ -7,7 +7,7 @@ pub const fn gcd(mut a: usize, mut b: usize) -> usize {
     a
 }
 
-pub const fn lcm(a: usize, b: usize) -> usize {
+pub(crate) const fn lcm(a: usize, b: usize) -> usize {
     if a == 0 || b == 0 {
         0
     } else {

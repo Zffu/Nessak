@@ -1,3 +1,8 @@
+//! The configuration presets for the const versions of the implementations.
+//! There is one preset per "recognized" Nessak standard with the ability of creating your own.
+
+/// Represents a parameter preset inside of a constant implementation inside of this crate.
+/// Normally, these values would be provided at runtime but these allow to pass them at compile time on a const implementation.
 pub trait TundraPreset {
     const DIGEST_SIZE: usize;
     const LANE_SIZE: usize;
