@@ -9,10 +9,15 @@ license = "MIT"
 categories = ["algorithms", "cryptography"]
 edition = "2024"
 
+[[test]]
+name = "tundra_rt"
+required-features = ["tundra-nessak"]
+
 [features]
 tundra = []
 tundra-nessak = ["tundra"]
 standalone = []
 safety-checks = []
+const = []
 
 default = ["safety-checks", "tundra-nessak", "standalone"]

@@ -1,6 +1,15 @@
+#[cfg(not(feature = "const"))]
 use alloc::vec;
+
 use alloc::vec::Vec;
 
+#[cfg(feature = "const")]
+use crate::preset::TundraPreset;
+
+#[cfg(feature = "const")]
+pub mod comptime;
+
+#[cfg(not(feature = "const"))]
 use crate::utils::math::lcm;
 
 #[cfg(feature = "tundra-nessak")]
@@ -20,6 +29,26 @@ pub trait TundraImplementation {
     fn descent_compression_inner(lane_a: &mut [u32], lane_b: &[u32], k: usize, p: usize, r: usize);
 }
 
+#[cfg(feature = "const")]
+pub trait Tundra<P: TundraPreset> {
+    fn sanitize_input(input: &[u8]) -> Vec<u8>;
+
+    fn expand_input_buffer(input: &[u8]) -> Vec<u32>;
+
+    fn do_buffer_permutations(buffer: &mut [u32]);
+
+    fn compress_buffer_into_internal_state(buffer: &mut [u32]) -> Vec<u32>;
+
+    fn descent_generation_round(lane_a: &mut [u32], lane_b: &[u32]);
+
+    fn descend_internal_state(internal_state: Vec<u32>) -> Vec<u32>;
+
+    fn get_digest(internal_state: Vec<u32>) -> Vec<u8>;
+
+    fn produce_hash(input: &[u8]) -> Vec<u8>;
+}
+
+#[cfg(not(feature = "const"))]
 pub trait Tundra {
     fn sanitize_input(input: &[u8], digest_size: u64) -> Vec<u8>;
 
@@ -71,6 +100,7 @@ pub trait Tundra {
     ) -> Vec<u8>;
 }
 
+#[cfg(not(feature = "const"))]
 impl<I: TundraImplementation> Tundra for I {
     fn sanitize_input(input: &[u8], digest_size: u64) -> Vec<u8> {
         let original_len = input.len();

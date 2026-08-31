@@ -2,9 +2,13 @@
 //! The Nessak implementation of the Tundra structure.
 //!
 
+#[cfg(not(feature = "const"))]
 use alloc::vec::Vec;
 
-use crate::tundra::{Tundra, TundraImplementation};
+#[cfg(not(feature = "const"))]
+use crate::tundra::Tundra;
+
+use crate::tundra::TundraImplementation;
 
 pub const INNER_PERMUTATION_ROT: [u32; 25] = [
     0, 36, 3, 41, 18, 1, 44, 10, 45, 2, 62, 6, 43, 15, 61, 28, 55, 25, 21, 56, 27, 20, 39, 8, 14,
@@ -214,6 +218,7 @@ impl TundraImplementation for NessakTundraImplementation {
     }
 }
 
+#[cfg(not(feature = "const"))]
 impl NessakTundraImplementation {
     pub fn k2048_2048(input: &[u8]) -> Vec<u8> {
         Self::produce_hash(input, 2048, 2048, 64, 8, 24, 4, 1)
