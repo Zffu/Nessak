@@ -11,7 +11,8 @@ edition = "2024"
 
 [features]
 tundra = []
+tundra-nessak = ["tundra"]
 standalone = []
 safety-checks = []
 
-default = ["safety-checks", "tundra", "standalone"]
+default = ["safety-checks", "tundra-nessak", "standalone"]

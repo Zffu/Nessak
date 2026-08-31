@@ -3,6 +3,7 @@ use alloc::vec::Vec;
 
 use crate::utils::math::lcm;
 
+#[cfg(feature = "tundra-nessak")]
 pub mod nessak;
 
 pub trait TundraImplementation {
