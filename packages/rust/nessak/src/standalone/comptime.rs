@@ -1,21 +1,37 @@
-//! The constant implementation of Tundra.
-//! Similar to the normal implementation but uses [`TundraPreset`] to store parameters rather than at runtime.
-
-use alloc::vec;
 use alloc::vec::Vec;
 
 use crate::{
+    impls::{compress_inner, descent_compression_inner, expand_generate, permutation_inner},
     preset::TundraPreset,
-    tundra::{TundraConst, TundraImplementation},
+    standalone::Nessak,
     utils::math::lcm,
 };
 
-impl<I: TundraImplementation, P: TundraPreset> TundraConst<P> for I {
+pub trait CompNessak<P: TundraPreset> {
+    fn sanitize_input(input: &[u8]) -> Vec<u8>;
+
+    fn expand_input_buffer(input: &[u8]) -> Vec<u32>;
+
+    fn do_buffer_permutations(buffer: &mut [u32]);
+
+    fn compress_buffer_into_internal_state(buffer: &mut [u32]) -> Vec<u32>;
+
+    fn descent_generation_round(lane_a: &mut [u32], lane_b: &[u32]);
+
+    fn descend_internal_state(compression_set: Vec<u32>) -> Vec<u32>;
+
+    fn get_digest(internal_state: Vec<u32>) -> Vec<u8>;
+
+    fn produce_hash(input: &[u8]) -> Vec<u8>;
+}
+
+impl<P: TundraPreset> CompNessak<P> for Nessak {
+    #[inline]
     fn sanitize_input(input: &[u8]) -> Vec<u8> {
         let original_len = input.len();
         let mut expanded_input = input.to_vec();
 
-        let mut padded_len = (I::MINIMUM_EXPANSION_LEN + 17).max(original_len + 17);
+        let mut padded_len = 73.max(original_len + 17);
 
         if padded_len % 4 != 0 {
             padded_len += 4 - (padded_len % 4);
@@ -33,8 +49,9 @@ impl<I: TundraImplementation, P: TundraPreset> TundraConst<P> for I {
         expanded_input
     }
 
+    #[inline]
     fn expand_input_buffer(input: &[u8]) -> Vec<u32> {
-        let mut internal_state_size: usize = lcm(I::PERMUTATION_MUL_SIZE * 4, P::LANE_SIZE / 8);
+        let mut internal_state_size: usize = lcm(200, P::LANE_SIZE / 8);
 
         internal_state_size =
             ((input.len() * P::INTERNAL_STATE_MINIMUM_LENGTH_MULTIPLIER + internal_state_size - 1)
@@ -51,30 +68,31 @@ impl<I: TundraImplementation, P: TundraPreset> TundraConst<P> for I {
         );
 
         for n in input_word_count..(internal_state_size / 2) {
-            buffer.push(I::expand_generate(n, &buffer, input_word_count));
+            buffer.push(expand_generate(n, &buffer, input_word_count));
         }
 
         buffer
     }
 
+    #[inline]
     fn do_buffer_permutations(buffer: &mut [u32]) {
-        let block_count = buffer.len() / I::PERMUTATION_MUL_SIZE;
+        let block_count = buffer.len() / 50;
 
         // Preallocate the capacity
-        let mut harmonizer: Vec<u32> = vec![0; I::PERMUTATION_MUL_SIZE];
+        let mut harmonizer: [u32; 50] = [0; 50];
 
         for _ in 0..P::OUTER_PERMUTATION_ROUNDS {
             harmonizer.fill(0);
 
-            for i in 0..block_count * I::PERMUTATION_MUL_SIZE {
-                let y = i % I::PERMUTATION_MUL_SIZE;
+            for i in 0..block_count * 50 {
+                let y = i % 50;
 
                 harmonizer[y] ^= buffer[i];
             }
 
             for x in 0..block_count {
-                I::permutation_inner(
-                    &mut buffer[x * I::PERMUTATION_MUL_SIZE..(x + 1) * I::PERMUTATION_MUL_SIZE],
+                permutation_inner(
+                    &mut buffer[x * 50..(x + 1) * 50],
                     &harmonizer,
                     P::INNER_PERMUTATION_ROUNDS,
                 );
@@ -82,10 +100,11 @@ impl<I: TundraImplementation, P: TundraPreset> TundraConst<P> for I {
         }
     }
 
+    #[inline]
     fn compress_buffer_into_internal_state(buffer: &mut [u32]) -> Vec<u32> {
         let mut internal_state = Vec::with_capacity(buffer.len() / 2);
 
-        let amount_of_parts = buffer.len() / I::PART_SIZE;
+        let amount_of_parts = buffer.len() / 8;
 
         let mut part_a_index;
         let mut part_b_index;
@@ -103,24 +122,25 @@ impl<I: TundraImplementation, P: TundraPreset> TundraConst<P> for I {
                 k += 2;
             }
 
-            let part_a_offset = I::PART_SIZE * part_a_index;
-            let part_b_offset = I::PART_SIZE * part_b_index;
+            let part_a_offset = 8 * part_a_index;
+            let part_b_offset = 8 * part_b_index;
 
             for r in 0..P::COMPRESSION_ROUNDS {
-                let (part_a, part_b) = buffer.split_at_mut(part_a_offset + I::PART_SIZE);
-                let part_a = &mut part_a[part_a_offset..part_a_offset + I::PART_SIZE];
-                let part_b = &part_b
-                    [part_b_offset - (part_a_offset + I::PART_SIZE)..part_b_offset - part_a_offset];
+                let (part_a, part_b) = buffer.split_at_mut(part_a_offset + 8);
+                let part_a = &mut part_a[part_a_offset..part_a_offset + 8];
+                let part_b =
+                    &part_b[part_b_offset - (part_a_offset + 8)..part_b_offset - part_a_offset];
 
-                I::compress_inner(part_a, part_b, r);
+                compress_inner(part_a, part_b, r);
             }
 
-            internal_state.extend_from_slice(&buffer[part_a_offset..part_a_offset + I::PART_SIZE]);
+            internal_state.extend_from_slice(&buffer[part_a_offset..part_a_offset + 8]);
         }
 
         internal_state
     }
 
+    #[inline]
     fn descent_generation_round(lane_a: &mut [u32], lane_b: &[u32]) {
         let lane_expansion_count = lane_a.len() / (256 / 32);
 
@@ -128,11 +148,12 @@ impl<I: TundraImplementation, P: TundraPreset> TundraConst<P> for I {
             for k in 0..lane_expansion_count {
                 let p = k.saturating_sub(1);
 
-                I::descent_compression_inner(lane_a, lane_b, k, p, r);
+                descent_compression_inner(lane_a, lane_b, k, p, r);
             }
         }
     }
 
+    #[inline]
     fn descend_internal_state(mut compression_set: Vec<u32>) -> Vec<u32> {
         let mut working_set = Vec::with_capacity(compression_set.len() / 2);
 
@@ -155,7 +176,7 @@ impl<I: TundraImplementation, P: TundraPreset> TundraConst<P> for I {
 
                 output.copy_from_slice(&lane_a);
 
-                <Self as TundraConst<P>>::descent_generation_round(output, lane_b);
+                <Self as CompNessak<P>>::descent_generation_round(output, lane_b);
             }
 
             core::mem::swap(&mut compression_set, &mut working_set);
@@ -167,14 +188,15 @@ impl<I: TundraImplementation, P: TundraPreset> TundraConst<P> for I {
         working_set
     }
 
+    #[inline]
     fn get_digest(internal_state: Vec<u32>) -> Vec<u8> {
-        let lane = <Self as TundraConst<P>>::descend_internal_state(internal_state);
+        let lane = <Self as CompNessak<P>>::descend_internal_state(internal_state);
 
         let word_count_digest = ((P::DIGEST_SIZE + P::DIGEST_SIZE % 32) / 32) as usize;
         let mut digest = Vec::with_capacity(word_count_digest * 4);
 
         let mut ind = 0;
-        while digest.len() < P::DIGEST_SIZE / 8 && ind < lane.len() {
+        while digest.len() < P::DIGEST_SIZE as usize / 8 && ind < lane.len() {
             digest.extend_from_slice(&lane[ind].to_le_bytes());
 
             ind += 1;
@@ -183,6 +205,7 @@ impl<I: TundraImplementation, P: TundraPreset> TundraConst<P> for I {
         digest[0..P::DIGEST_SIZE as usize / 8].to_vec()
     }
 
+    #[inline]
     fn produce_hash(input: &[u8]) -> Vec<u8> {
         const {
             assert!(P::DIGEST_SIZE != 0);
@@ -197,15 +220,22 @@ impl<I: TundraImplementation, P: TundraPreset> TundraConst<P> for I {
             assert!(P::LANE_SIZE % 256 == 0);
         }
 
-        let input = <Self as TundraConst<P>>::sanitize_input(input);
+        let input = <Self as CompNessak<P>>::sanitize_input(input);
 
-        let mut buffer = <Self as TundraConst<P>>::expand_input_buffer(&input);
+        let mut buffer = <Self as CompNessak<P>>::expand_input_buffer(&input);
 
-        <Self as TundraConst<P>>::do_buffer_permutations(&mut buffer);
+        <Self as CompNessak<P>>::do_buffer_permutations(&mut buffer);
 
         let internal_state =
-            <Self as TundraConst<P>>::compress_buffer_into_internal_state(&mut buffer);
+            <Self as CompNessak<P>>::compress_buffer_into_internal_state(&mut buffer);
 
-        return <Self as TundraConst<P>>::get_digest(internal_state);
+        return <Self as CompNessak<P>>::get_digest(internal_state);
+    }
+}
+
+impl Nessak {
+    /// Small helper to use Nessak presets in a cleaner way.
+    pub fn produce_hash<P: TundraPreset>(input: &[u8]) -> Vec<u8> {
+        <Nessak as CompNessak<P>>::produce_hash(input)
     }
 }

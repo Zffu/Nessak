@@ -16,6 +16,13 @@ extern crate alloc;
 #[cfg(feature = "tundra")]
 pub mod tundra;
 
+#[cfg(feature = "standalone")]
+pub mod standalone;
+
+/// Implementations of the Nessak inner functions.
+#[cfg(feature = "nessak_impls")]
+pub mod impls;
+
 /// The configuration presets for the const versions of the implementations.
 /// There is one preset per "recognized" Nessak standard with the ability of creating your own.
 #[cfg(feature = "const")]

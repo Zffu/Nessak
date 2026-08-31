@@ -19,9 +19,10 @@ required-features = ["tundra-nessak", "const"]
 
 [features]
 tundra = []
-tundra-nessak = ["tundra"]
-standalone = []
+tundra-nessak = ["tundra", "nessak_impls"]
+standalone = ["nessak_impls"]
 safety-checks = []
 const = []
+nessak_impls = []
 
 default = ["safety-checks", "tundra-nessak", "standalone"]
