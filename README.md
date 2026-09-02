@@ -3,8 +3,8 @@
 
 This introduces a new _experimental_ hash function family called **Nessak** as well as an _experimental_ hash function structure called **Tundra**.
 
-> [!INFO]
-> Plus d'information [ici](https://zffu.dev/works/nessak/Nessak.pdf)
+> [!NOTE]
+> More info [here](https://zffu.dev/works/nessak/Nessak.pdf)
 
 > This function family or structure has not went trough a professional cryptanalysis process, only through common and brute force tests. Thus, any real security cannot be claimed as these are strictly experimental for now.
 

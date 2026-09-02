@@ -3,7 +3,7 @@
 
 Cela introduit une nouvelle famille de fonctions de hachage _expérimentale_ appelée **Nessak**, ainsi qu'une structure de fonction de hachage _expérimentale_ appelée **Tundra**.
 
-> [!INFO]
+> [!NOTE]
 > Plus d'information [ici](https://zffu.dev/works/nessak/Nessak-French.pdf)
 
 > Cette famille de fonctions et cette structure n'ont pas fait l'objet d'une analyse cryptographique professionnelle, mais seulement de tests courants et d'attaques par force brute. Par conséquent, aucune véritable sécurité ne peut être revendiquée, ces éléments étant pour l'instant strictement expérimentaux.
