@@ -3,6 +3,9 @@ The standalone implementation of Nessak
 """
 import math
 
+import numpy as np
+from numpy.typing import NDArray
+
 from ..impls import (
     compression_inner,
     descent_compression_inner,
@@ -16,10 +19,10 @@ class Nessak:
         """Sanitizes the input. Allowing it to be correctly passed to the hash function regardless of it's original size.
 
         Args:
-            input (list[int]): the input as bytes
+            input (list[int]): the input as list[int]
 
         Returns:
-            list[int]: the padded input as bytes.
+            list[int]: the padded input as list[int].
         """
         input = input.copy()  # We copy since we shouldn't consume the input
 
@@ -46,19 +49,17 @@ class Nessak:
         input: list[int],
         lane_size: int,
         internal_state_minimum_length_multiplier: int,
-    ) -> list[int]:
+    ) -> NDArray[np.uint32]:
         """Expands the input into an arbitrarily sized buffer
 
         Args:
-                input (list[int]): the input as bytes
+                input (list[int]): the input as list[int]
                 lane_size (int): the size of an individual descent lane (in bits)
                 internal_state_minimum_length_multiplier(int): The multiplier of the minimum length of the internal state (based on the input length).
 
         Returns:
                 list[int]: the buffer as words (32-bit integers)
         """
-        buffer: list[int] = []
-        input_words: list[int] = []
 
         internal_state_size = math.lcm(
             200, lane_size // 8
@@ -73,19 +74,20 @@ class Nessak:
             // internal_state_size
         ) * internal_state_size
 
-        for i in range(0, len(input), 4):
-            input_words.append(int.from_bytes(input[i : i + 4], byteorder="big"))
-
-        buffer = input_words.copy()
-
         total_words: int = internal_state_size // 2
 
-        for n in range(len(input_words), total_words):
-            buffer.append(expand_generate(n, buffer, len(input_words)))
+        input_words = len(input) // 4
+
+        buffer = np.empty(total_words, dtype=np.uint32)
+
+        buffer[:input_words] = np.frombuffer(bytes(input), dtype=">u4").astype(np.uint32)
+
+        for n in range(input_words, total_words):
+            buffer[n] = expand_generate(n, buffer, input_words)
 
         return buffer
 
-    def do_buffer_permutations(self, buffer: list[int], inner_permutation_rounds: int, outer_permutation_rounds: int):
+    def do_buffer_permutations(self, buffer: NDArray[np.uint32], inner_permutation_rounds: int, outer_permutation_rounds: int):
         """Perform a given amount of permutation rounds on the provided buffer.
 
         Args:
@@ -94,33 +96,16 @@ class Nessak:
             outer_permutation_rounds (int): the amount of outer rounds of permutations.
         """
 
-        block_count = len(buffer) // 50
-
-        pre = buffer.copy()
+        blocks = buffer.reshape(-1, 50)
 
         for _ in range(outer_permutation_rounds):
-            state = [0] * 50
-            harmonizer = [0] * 50
+            harmonizer = np.bitwise_xor.reduce(blocks, axis=0)
 
-            for i in range(50):
-                harmonizer[i] = buffer[i]
-
-            for x in range(1, block_count):
-                for i in range(50):
-                    harmonizer[i] ^= buffer[50 * x + i]
-
-            for x in range(block_count):
-                for i in range(50):
-                    state[i] = buffer[x * 50 + i]
-
+            for state in blocks:
                 permutation_inner(state, harmonizer, inner_permutation_rounds)
 
-                for i in range(50):
-                    buffer[x * 50 + i] = state[i]
 
-        print("Permutation applied? {}", pre != buffer)
-
-    def compress_buffer_into_internal_state(self, buffer: list[int], compression_rounds: int) -> list[int]:
+    def compress_buffer_into_internal_state(self, buffer: NDArray[np.uint32], compression_rounds: int) -> NDArray[np.uint32]:
         """Compresses the buffer into the internal state. A buffer is twice as big as an internal state
 
         Args:
@@ -130,7 +115,9 @@ class Nessak:
         Returns:
             list[int]: the internal state (as an array of words)
         """
-        internal_state: list[int] = []
+        internal_state: NDArray[np.uint32] = np.empty(len(buffer) // 2, dtype=np.uint32)
+
+        parts = buffer.reshape(-1, 8)
 
         amount_of_parts = len(buffer) // 8
 
@@ -138,6 +125,7 @@ class Nessak:
         part_b_index = 0
 
         k = 0
+        i = 0
 
         while k < amount_of_parts:
             part_a_index = k
@@ -150,23 +138,17 @@ class Nessak:
                 k += 2
 
             part_a_offset = 8 * part_a_index
-            part_b_offset = 8 * part_b_index
 
             for r in range(compression_rounds):
-                part_a = buffer[part_a_offset:part_a_offset + 8]
-                part_b = buffer[part_b_offset:part_b_offset + 8]
+                compression_inner(parts[part_a_index], parts[part_b_index], r)
 
-                compression_inner(part_a, part_b, r)
+            internal_state[i * 8:(i + 1)*8] = buffer[part_a_offset:part_a_offset + 8] 
 
-                buffer[part_a_offset:part_a_offset + 8] = part_a
-                buffer[part_b_offset:part_b_offset + 8] = part_b
-
-            for i in range(8):
-                internal_state.append(buffer[part_a_offset + i])
+            i += 1
 
         return internal_state
 
-    def descent_generation_round(self, lane_a: list[int], lane_b: list[int], descent_compression_rounds: int) -> list[int]:
+    def descent_generation_round(self, lane_a: NDArray[np.uint32], lane_b: NDArray[np.uint32], descent_compression_rounds: int) -> NDArray[np.uint32]:
         """Performs a descent generation round of lane A and B.
 
         Args:
@@ -178,7 +160,7 @@ class Nessak:
             list[int]: The lane result of the compression between the two lanes
         """
 
-        lane_expansion_count = len(lane_a) // (256 // 32)
+        lane_expansion_count = lane_a.size // (256 // 32)
 
         for r in range(descent_compression_rounds):
             for k in range(lane_expansion_count):
@@ -193,36 +175,46 @@ class Nessak:
 
         return lane_a.copy()
 
-    def descend_internal_state(self, internal_state: list[int], lane_size_in_words: int, descent_compression_rounds: int) -> list[int]:
-        """Performs the descent stage of the internal state
+    def descend_internal_state(
+        self,
+        compression_set: NDArray[np.uint32],
+        lane_size_in_words: int,
+        descent_compression_rounds: int,
+    ) -> NDArray[np.uint32]:
 
-        Args:
-            internal_state (list[int]): The internal state
-            lane_size_in_words (int): The size of a descent lane in words (32-bit integers)
-            descent_compression_rounds (int): The amount of compression rounds in each descent round.
+        working_set = np.empty_like(compression_set)
 
-        Returns:
-            list[int]: The final lane.
-        """
-        working_set: list[list[int]] = []
-        compression_set: list[list[int]] = []
+        compression_set_len = len(compression_set)
 
-        for i in range(0, len(internal_state), lane_size_in_words):
-            compression_set.append(internal_state[i:i + lane_size_in_words])
+        while compression_set_len > lane_size_in_words:
+            lane_count = compression_set_len // lane_size_in_words
 
-        while len(compression_set) > 1:
-            for n in range(len(compression_set) // 2):
-                lane_a = compression_set[n * 2]
-                lane_b = compression_set[n * 2 + 1]
+            for n in range(lane_count // 2):
+                start_a = n * 2 * lane_size_in_words
+                start_b = start_a + lane_size_in_words
+                start_out = n * lane_size_in_words
 
-                working_set.append(self.descent_generation_round(lane_a, lane_b, descent_compression_rounds))
+                lane_a = compression_set[
+                    start_a:start_a + lane_size_in_words
+                ]
+                lane_b = compression_set[
+                    start_b:start_b + lane_size_in_words
+                ]
 
-            compression_set = working_set.copy()
-            working_set.clear()
+                working_set[
+                    start_out:start_out + lane_size_in_words
+                ] = self.descent_generation_round(
+                    lane_a,
+                    lane_b,
+                    descent_compression_rounds,
+                )
 
-        return compression_set[0]
+            compression_set_len //= 2
+            compression_set, working_set = working_set, compression_set
 
-    def get_digest(self, internal_state: list[int], digest_size: int, lane_size_in_words: int, descent_compression_rounds: int) -> list[int]:
+        return compression_set[:lane_size_in_words]
+
+    def get_digest(self, internal_state: NDArray[np.uint32], digest_size: int, lane_size_in_words: int, descent_compression_rounds: int) -> list[int]:
         """Performs descent and gathers the digest from the final lane.
 
         Args:
@@ -236,12 +228,9 @@ class Nessak:
         """
         lane = self.descend_internal_state(internal_state, lane_size_in_words, descent_compression_rounds)
 
-        digest: list[int] = []
+        digest = lane.astype("<u4").tobytes()
 
-        for k in lane:
-            digest += k.to_bytes(4, 'little')
-
-        return digest[0:digest_size // 8]
+        return list(digest[:digest_size // 8])
 
     def produce_hash(self, input: list[int], digest_size: int = 256, lane_size: int = 256, compression_rounds: int = 64, descent_compression_rounds: int = 8, inner_permutation_rounds: int = 24, outer_permutation_rounds: int = 4, internal_state_minimum_length_multiplier: int = 1) -> list[int]:
         """Uses the Tundra implementation to generate the hash of the given input.
@@ -257,7 +246,7 @@ class Nessak:
             internal_state_minimum_length_multiplier (int, optional): The multiplier for the minimum length of the internal state. Defaults to 1.
 
         Returns:
-            list[int]: The output digest in bytes
+            list[int]: The output digest in list[int]
         """
 
         assert digest_size > 0

@@ -1,6 +1,9 @@
 import math
 from abc import ABC, abstractmethod
 
+import numpy as np
+from numpy.typing import NDArray
+
 
 class Tundra(ABC):
     def __init__(self, minimum_expansion_len: int, permutation_mul_size: int, part_size: int) -> None:
@@ -42,19 +45,17 @@ class Tundra(ABC):
         input: list[int],
         lane_size: int,
         internal_state_minimum_length_multiplier: int,
-    ) -> list[int]:
+    ) -> NDArray[np.uint32]:
         """Expands the input into an arbitrarily sized buffer
 
         Args:
-                input (list[int]): the input as bytes
+                input (list[int]): the input as list[int]
                 lane_size (int): the size of an individual descent lane (in bits)
                 internal_state_minimum_length_multiplier(int): The multiplier of the minimum length of the internal state (based on the input length).
 
         Returns:
                 list[int]: the buffer as words (32-bit integers)
         """
-        buffer: list[int] = []
-        input_words: list[int] = []
 
         internal_state_size = math.lcm(
             4 * self.permutation_mul_size, lane_size // 8
@@ -69,19 +70,20 @@ class Tundra(ABC):
             // internal_state_size
         ) * internal_state_size
 
-        for i in range(0, len(input), 4):
-            input_words.append(int.from_bytes(input[i : i + 4], byteorder="big"))
-
-        buffer = input_words.copy()
-
         total_words: int = internal_state_size // 2
 
-        for n in range(len(input_words), total_words):
-            buffer.append(self.function_g(n, buffer, len(input_words)))
+        input_words = len(input) // 4
+
+        buffer = np.empty(total_words, dtype=np.uint32)
+
+        buffer[:input_words] = np.frombuffer(bytes(input), dtype=">u4").astype(np.uint32)
+
+        for n in range(input_words, total_words):
+            buffer[n] = self.function_g(n, buffer, input_words)
 
         return buffer
 
-    def do_buffer_permutations(self, buffer: list[int], inner_permutation_rounds: int, outer_permutation_rounds: int):
+    def do_buffer_permutations(self, buffer: NDArray[np.uint32], inner_permutation_rounds: int, outer_permutation_rounds: int):
         """Perform a given amount of permutation rounds on the provided buffer.
 
         Args:
@@ -90,29 +92,16 @@ class Tundra(ABC):
             outer_permutation_rounds (int): the amount of outer rounds of permutations.
         """
 
-        block_count = len(buffer) // self.permutation_mul_size
+        blocks = buffer.reshape(-1, self.permutation_mul_size)
 
         for _ in range(outer_permutation_rounds):
-            state = [0] * self.permutation_mul_size
-            harmonizer = [0] * self.permutation_mul_size
+            harmonizer = np.bitwise_xor.reduce(blocks, axis=0)
 
-            for i in range(self.permutation_mul_size):
-                harmonizer[i] = buffer[i]
-
-            for x in range(1, block_count):
-                for i in range(self.permutation_mul_size):
-                    harmonizer[i] ^= buffer[self.permutation_mul_size * x + i]
-
-            for x in range(block_count):
-                for i in range(self.permutation_mul_size):
-                    state[i] = buffer[x * self.permutation_mul_size + i]
-
+            for state in blocks:
                 self.function_p(state, harmonizer, inner_permutation_rounds)
 
-                for i in range(self.permutation_mul_size):
-                    buffer[x * self.permutation_mul_size + i] = state[i]
 
-    def compress_buffer_into_internal_state(self, buffer: list[int], compression_rounds: int) -> list[int]:
+    def compress_buffer_into_internal_state(self, buffer: NDArray[np.uint32], compression_rounds: int) -> NDArray[np.uint32]:
         """Compresses the buffer into the internal state. A buffer is twice as big as an internal state
 
         Args:
@@ -122,14 +111,17 @@ class Tundra(ABC):
         Returns:
             list[int]: the internal state (as an array of words)
         """
-        internal_state: list[int] = []
+        internal_state: NDArray[np.uint32] = np.empty(len(buffer) // 2, dtype=np.uint32)
 
-        amount_of_parts = len(buffer) // self.part_size
+        parts = buffer.reshape(-1, 8)
+
+        amount_of_parts = len(buffer) // 8
 
         part_a_index = 0
         part_b_index = 0
 
         k = 0
+        i = 0
 
         while k < amount_of_parts:
             part_a_index = k
@@ -141,24 +133,18 @@ class Tundra(ABC):
                 part_b_index = k + 1
                 k += 2
 
-            part_a_offset = self.part_size * part_a_index
-            part_b_offset = self.part_size * part_b_index
+            part_a_offset = 8 * part_a_index
 
             for r in range(compression_rounds):
-                part_a = buffer[part_a_offset:part_a_offset + self.part_size]
-                part_b = buffer[part_b_offset:part_b_offset + self.part_size]
+                self.function_c(parts[part_a_index], parts[part_b_index], r)
 
-                self.function_c(part_a, part_b, r)
+            internal_state[i * 8:(i + 1)*8] = buffer[part_a_offset:part_a_offset + 8] 
 
-                buffer[part_a_offset:part_a_offset + self.part_size] = part_a
-                buffer[part_b_offset:part_b_offset + self.part_size] = part_b
-
-            for i in range(self.part_size):
-                internal_state.append(buffer[part_a_offset + i])
+            i += 1
 
         return internal_state
 
-    def descent_generation_round(self, lane_a: list[int], lane_b: list[int], descent_compression_rounds: int) -> list[int]:
+    def descent_generation_round(self, lane_a: NDArray[np.uint32], lane_b: NDArray[np.uint32], descent_compression_rounds: int) -> NDArray[np.uint32]:
         """Performs a descent generation round of lane A and B.
 
         Args:
@@ -170,7 +156,7 @@ class Tundra(ABC):
             list[int]: The lane result of the compression between the two lanes
         """
 
-        lane_expansion_count = len(lane_a) // (256 // 32)
+        lane_expansion_count = lane_a.size // (256 // 32)
 
         for r in range(descent_compression_rounds):
             for k in range(lane_expansion_count):
@@ -185,36 +171,46 @@ class Tundra(ABC):
 
         return lane_a.copy()
 
-    def descend_internal_state(self, internal_state: list[int], lane_size_in_words: int, descent_compression_rounds: int) -> list[int]:
-        """Performs the descent stage of the internal state
+    def descend_internal_state(
+        self,
+        compression_set: NDArray[np.uint32],
+        lane_size_in_words: int,
+        descent_compression_rounds: int,
+    ) -> NDArray[np.uint32]:
 
-        Args:
-            internal_state (list[int]): The internal state
-            lane_size_in_words (int): The size of a descent lane in words (32-bit integers)
-            descent_compression_rounds (int): The amount of compression rounds in each descent round.
+        working_set = np.empty_like(compression_set)
 
-        Returns:
-            list[int]: The final lane.
-        """
-        working_set: list[list[int]] = []
-        compression_set: list[list[int]] = []
+        compression_set_len = len(compression_set)
 
-        for i in range(0, len(internal_state), lane_size_in_words):
-            compression_set.append(internal_state[i:i + lane_size_in_words])
+        while compression_set_len > lane_size_in_words:
+            lane_count = compression_set_len // lane_size_in_words
 
-        while len(compression_set) > 1:
-            for n in range(len(compression_set) // 2):
-                lane_a = compression_set[n * 2]
-                lane_b = compression_set[n * 2 + 1]
+            for n in range(lane_count // 2):
+                start_a = n * 2 * lane_size_in_words
+                start_b = start_a + lane_size_in_words
+                start_out = n * lane_size_in_words
 
-                working_set.append(self.descent_generation_round(lane_a, lane_b, descent_compression_rounds))
+                lane_a = compression_set[
+                    start_a:start_a + lane_size_in_words
+                ]
+                lane_b = compression_set[
+                    start_b:start_b + lane_size_in_words
+                ]
 
-            compression_set = working_set.copy()
-            working_set.clear()
+                working_set[
+                    start_out:start_out + lane_size_in_words
+                ] = self.descent_generation_round(
+                    lane_a,
+                    lane_b,
+                    descent_compression_rounds,
+                )
 
-        return compression_set[0]
+            compression_set_len //= 2
+            compression_set, working_set = working_set, compression_set
 
-    def get_digest(self, internal_state: list[int], digest_size: int, lane_size_in_words: int, descent_compression_rounds: int) -> list[int]:
+        return compression_set[:lane_size_in_words]
+
+    def get_digest(self, internal_state: NDArray[np.uint32], digest_size: int, lane_size_in_words: int, descent_compression_rounds: int) -> list[int]:
         """Performs descent and gathers the digest from the final lane.
 
         Args:
@@ -228,12 +224,9 @@ class Tundra(ABC):
         """
         lane = self.descend_internal_state(internal_state, lane_size_in_words, descent_compression_rounds)
 
-        digest: list[int] = []
+        digest = lane.astype("<u4").tobytes()
 
-        for k in lane:
-            digest += k.to_bytes(4, 'little')
-
-        return digest[0:digest_size // 8]
+        return list(digest[:digest_size // 8])
 
     def produce_hash(self, input: list[int], digest_size: int = 256, lane_size: int = 256, compression_rounds: int = 64, descent_compression_rounds: int = 8, inner_permutation_rounds: int = 24, outer_permutation_rounds: int = 4, internal_state_minimum_length_multiplier: int = 1) -> list[int]:
         """Uses the Tundra implementation to generate the hash of the given input.
@@ -249,7 +242,7 @@ class Tundra(ABC):
             internal_state_minimum_length_multiplier (int, optional): The multiplier for the minimum length of the internal state. Defaults to 1.
 
         Returns:
-            list[int]: The output digest in bytes
+            list[int]: The output digest in list[int]
         """
 
         assert digest_size > 0
@@ -275,17 +268,17 @@ class Tundra(ABC):
         return self.get_digest(internal_state,  digest_size, lane_size_in_words, descent_compression_rounds)
 
     @abstractmethod
-    def function_g(self, n: int, o: list[int], w: int) -> int:
+    def function_g(self, n: int, o: NDArray[np.uint32], w: int) -> int:
         """The G function of the Tundra construction"""
 
     @abstractmethod
-    def function_p(self, state: list[int], harmonizer: list[int], inner_permutation_rounds: int):
+    def function_p(self, state: NDArray[np.uint32], harmonizer: NDArray[np.uint32], inner_permutation_rounds: int):
         """The P function of the Tundra construction"""
 
     @abstractmethod
-    def function_c(self, part_a: list[int], part_b: list[int], round: int):
+    def function_c(self, part_a: NDArray[np.uint32], part_b: NDArray[np.uint32], round: int):
         """The C function of the Tundra construction"""
     
     @abstractmethod
-    def function_d(self, lane_a: list[int], lane_b: list[int], k: int, p: int, r: int) -> list[int]:
+    def function_d(self, lane_a: NDArray[np.uint32], lane_b: NDArray[np.uint32], k: int, p: int, r: int) -> list[int]:
         """The P function of the Tundra construction"""
