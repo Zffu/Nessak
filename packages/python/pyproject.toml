@@ -8,11 +8,16 @@ version = "1.0.0"
 description = "Nessak is an experimental hash function powered by the experimental Tundra hash structure."
 readme = "./README.md"
 requires-python = ">=3.9"
-license = {text = "MIT"}
-authors = [
-    {name = "Zffu", email = "zffu@zffu.dev"}
-]
-dependencies = []
+license = { text = "MIT" }
+authors = [{ name = "Zffu", email = "zffu@zffu.dev" }]
+classifiers = ["Security :: Cryptography", "Typing :: Typed"]
+dependencies = ["numpy>=1.21"]
+
+[project.urls]
+Source = "https://github.com/Zffu/Nessak"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[dependency-groups]
+dev = ["pytest>=7.4.4"]

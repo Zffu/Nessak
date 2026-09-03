@@ -1,13 +1,14 @@
 import numpy as np
 from numpy.typing import NDArray
 
-PERMUTATION_ROT = [
-	[0, 36, 3, 41, 18],
-	[1, 44, 10, 45, 2],
-	[62, 6, 43, 15, 61],
-	[28, 55, 25, 21, 56],
-	[27, 20, 39, 8, 14]
-]
+PERMUTATION_ROT = np.array(
+    [
+        0, 36, 3, 41, 18,
+    	1, 44, 10, 45, 2,
+        62, 6, 43, 15, 61,
+        28, 55, 25, 21, 56,
+        27, 20, 39, 8, 14
+    ], dtype=np.uint32)
 
 PERMUTATION_RC = [
 	0x0000000000000001,
@@ -72,30 +73,32 @@ DESCENT_COMPRESSION_CONSTANTS = [
 	0x5BE0CD19,
 ]
 
-MASK64 = (1 << 64) - 1
-MASK32 = (1 << 32) - 1
+MASK64 = np.uint64((1 << 64) - 1)
+MASK32 = np.uint32((1 << 32) - 1)
 
 
 def rotr(x: np.uint32, n: np.uint32) -> np.uint32:
 	return ((x >> n) | (x << (32 - n))) & MASK32
 
 def zeta0(x: np.uint32) -> np.uint32:
-	return (rotr(x, np.uint32(2)) ^ rotr(x, np.uint32(7)) ^ rotr(x, np.uint32(17)) ^ (x >> 3) & MASK32) & MASK32
+	return (rotr(x, np.uint32(2)) ^ rotr(x, np.uint32(7)) ^ rotr(x, np.uint32(17)) ^ (x >> np.uint32(3)) & MASK32) & MASK32
 
 def zeta1(x: np.uint32) -> np.uint32:
-	return (rotr(x, np.uint32(17)) ^ rotr(x, np.uint32(19)) ^ (x >> 11) & MASK32)
+	return (rotr(x, np.uint32(17)) ^ rotr(x, np.uint32(19)) ^ (x >> np.uint32(11)) & MASK32)
 
 def alpha0(x: np.uint32, y: np.uint32, z: np.uint32) -> np.uint32:
 	return ((x & rotr(y, np.uint32(3))) ^ ((~x) & z)) & MASK32
 
-def beta(x: int, y: int, z: int) -> int:
+def beta(x: np.uint32, y: np.uint32, z: np.uint32) -> np.uint32:
 	return ((x & y) ^ (z & x) ^ (y & z)) & MASK32
 
-def rotl_64(x: int, n: int) -> int:
+def rotl_64(x: np.uint32, n: np.uint32) -> np.uint32:
 	return ((x << n) | (x >> (64 - n))) & MASK64
 
-def expand_generate(n: int, o: NDArray[np.uint32], w: int) -> int:
-    return (o[n - w] + zeta0(o[n - 14]) + zeta1(o[n - 2]) + o[n - 6]) & MASK32
+def expand_generate(n: int, o: NDArray[np.uint32], w: int) -> np.uint32:
+	return np.add(o[n - w], np.add(zeta0(o[n - 14]), np.add(zeta1(o[n - 2]), o[n - 6], dtype=np.uint32), dtype=np.uint32), dtype=np.uint32)
+	  
+	#return (o[n - w] + zeta0(o[n - 14]) + zeta1(o[n - 2]) + o[n - 6]) & MASK32
 
 def permutation_inner(state: NDArray[np.uint32], harmonizer: NDArray[np.uint32], inner_permutation_rounds: int):
     state_64 = np.empty(25, np.uint64)
@@ -116,14 +119,14 @@ def permutation_inner(state: NDArray[np.uint32], harmonizer: NDArray[np.uint32],
             c[x] = state_64[x] ^ state_64[x + 5] ^ state_64[x + 10] ^ state_64[x + 15] ^ state_64[x + 20] ^ harmonizer_64[1 + r % 24]
 
         for x in range(5):
-            d[x] = c[(x + 4) % 5] ^ rotl_64(c[(x + 1) % 5], 1)
+            d[x] = c[(x + 4) % 5] ^ rotl_64(c[(x + 1) % 5], np.uint32(1))
 
             for y in range(5):
                 state_64[x + 5*y] = (state_64[x + 5*y] ^ d[x]) & MASK64
 
         for x in range(5):
             for y in range(5):
-                b[y + 5 * ((2*x + 3*y) % 5)] = rotl_64(state_64[x + 5*y], PERMUTATION_ROT[x][y])
+                b[y + 5 * ((2*x + 3*y) % 5)] = rotl_64(state_64[x + 5*y], PERMUTATION_ROT[x * 5 + y])
 
         for x in range(5):
             for y in range(5):
@@ -139,21 +142,21 @@ def compression_inner(part_a: NDArray[np.uint32], part_b: NDArray[np.uint32], ro
 	z1 = zeta0(part_a[3])
 	c = alpha0(part_a[3], part_a[4], part_a[5])
 
-	t1 = (part_a[7] + z1 + c + COMPRESSION_CONSTANTS[round % 64] + part_b[round % 8]) & MASK32
+	t1 = np.add(part_a[7], np.add(z1, np.add(c, np.add(COMPRESSION_CONSTANTS[round % 64], part_b[round % 8], dtype=np.uint32), dtype=np.uint32), dtype=np.uint32), dtype=np.uint32)
 
 	z0 = zeta1(part_a[7])
 	d = beta(part_a[0], part_a[1], part_a[2])
 
-	t2 = (z0 + d) & MASK32
+	t2 = np.add(z0, d, dtype=np.uint32)
 
 	part_a[7] = part_a[6]
 	part_a[6] = part_a[5]
 	part_a[5] = part_a[4]
-	part_a[4] = (d + t1) & MASK32
+	part_a[4] = np.add(d, t1, dtype=np.uint32)
 	part_a[3] = part_a[2]
 	part_a[2] = part_a[1]
 	part_a[1] = part_a[0]
-	part_a[0] = (t1 + t2) & MASK32
+	part_a[0] = np.add(t1, t2, dtype=np.uint32)
 
 def descent_compression_inner(lane_a: NDArray[np.uint32], lane_b: NDArray[np.uint32], k: int, p: int, r: int) -> NDArray[np.uint32]:
 	curr_offset = k * 8
@@ -162,20 +165,21 @@ def descent_compression_inner(lane_a: NDArray[np.uint32], lane_b: NDArray[np.uin
 	z0 = zeta0(lane_a[curr_offset + 3])
 	c = alpha0(lane_a[curr_offset + 3], lane_a[curr_offset + 4], lane_a[curr_offset + 5])
 
-	t1 = (lane_a[curr_offset + 7] + z0 + c + DESCENT_COMPRESSION_CONSTANTS[r % 8] + lane_b[prev_offset + r % 8]) & MASK32
+	t1 = np.add(lane_a[curr_offset + 7], np.add(z0, np.add(c, np.add(DESCENT_COMPRESSION_CONSTANTS[r % 8], lane_b[prev_offset + r % 8], dtype=np.uint32), dtype=np.uint), dtype=np.uint32))
 
-	z1 = zeta1((lane_a[curr_offset + 7] + lane_b[curr_offset + r % 8]) & MASK32)
+	z1 = zeta1(np.add(lane_a[curr_offset + 7], lane_b[curr_offset + r % 8], dtype=np.uint32))
+
 	d = beta(lane_a[curr_offset], lane_a[curr_offset + 1], lane_a[curr_offset + 2])
 
-	t2 = (z1 + d + lane_b[curr_offset + (r + 1) % 8]) & MASK32
+	t2 = np.add(z1, np.add(d, lane_b[curr_offset + (r + 1) % 8], dtype=np.uint32), dtype=np.uint32)
 
 	lane_a[curr_offset + 7] = lane_a[curr_offset + 6]
 	lane_a[curr_offset + 6] = lane_a[curr_offset + 5]
 	lane_a[curr_offset + 5] = lane_a[curr_offset + 4]
-	lane_a[curr_offset + 4] = (d + t1) & MASK32
+	lane_a[curr_offset + 4] = np.add(d, t1, dtype=np.uint32) 
 	lane_a[curr_offset + 3] = lane_a[curr_offset + 2]
 	lane_a[curr_offset + 2] = lane_a[curr_offset + 1]
 	lane_a[curr_offset + 1] = lane_a[curr_offset]
-	lane_a[curr_offset] = (t1 + t2) & MASK32
+	lane_a[curr_offset] = np.add(t1, t2, dtype=np.uint32)
 
 	return lane_a[curr_offset:curr_offset + 8]

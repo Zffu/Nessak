@@ -1,3 +1,6 @@
+import numpy as np
+from numpy.typing import NDArray
+
 from ..impls import (
     compression_inner,
     descent_compression_inner,
@@ -13,16 +16,16 @@ class Nessak(Tundra):
         self.permutation_mul_size = 50
         self.part_size = 8
 
-    def function_g(self, n: int, o: list[int], w: int) -> int:
+    def function_g(self, n: int, o: NDArray[np.uint32], w: int) -> np.uint32:
         return expand_generate(n, o, w)
 
-    def function_p(self, state: list[int], harmonizer: list[int], inner_permutation_rounds: int):
+    def function_p(self, state: NDArray[np.uint32], harmonizer: NDArray[np.uint32], inner_permutation_rounds: int):
         return permutation_inner(state, harmonizer, inner_permutation_rounds)
 
-    def function_c(self, part_a: list[int], part_b: list[int], round: int):
+    def function_c(self, part_a: NDArray[np.uint32], part_b: NDArray[np.uint32], round: int):
         return compression_inner(part_a, part_b, round)
 
-    def function_d(self, lane_a: list[int], lane_b: list[int], k: int, p: int, r: int) -> list[int]:
+    def function_d(self, lane_a: NDArray[np.uint32], lane_b: NDArray[np.uint32], k: int, p: int, r: int) -> NDArray[np.uint32]:
         return descent_compression_inner(lane_a, lane_b, k, p, r)
 
     def k2048_2048(self, input: list[int]) -> list[int]:

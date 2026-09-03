@@ -268,7 +268,7 @@ class Tundra(ABC):
         return self.get_digest(internal_state,  digest_size, lane_size_in_words, descent_compression_rounds)
 
     @abstractmethod
-    def function_g(self, n: int, o: NDArray[np.uint32], w: int) -> int:
+    def function_g(self, n: int, o: NDArray[np.uint32], w: int) -> np.uint32:
         """The G function of the Tundra construction"""
 
     @abstractmethod
@@ -280,5 +280,5 @@ class Tundra(ABC):
         """The C function of the Tundra construction"""
     
     @abstractmethod
-    def function_d(self, lane_a: NDArray[np.uint32], lane_b: NDArray[np.uint32], k: int, p: int, r: int) -> list[int]:
-        """The P function of the Tundra construction"""
+    def function_d(self, lane_a: NDArray[np.uint32], lane_b: NDArray[np.uint32], k: int, p: int, r: int) -> NDArray[np.uint32]:
+        """The D function of the Tundra construction"""
