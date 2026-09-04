@@ -7,7 +7,7 @@ name = "nessak"
 version = "0.0.1"
 description = "Nessak is an experimental hash function powered by the experimental Tundra hash structure."
 readme = "./README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Zffu", email = "zffu@zffu.dev" }]
 classifiers = ["Topic :: Security :: Cryptography", "Typing :: Typed", "Programming Language :: Python :: 3"]
